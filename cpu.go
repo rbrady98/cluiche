@@ -19,8 +19,21 @@ func (c *CPU) tick() {
 		opcode = c.readNext()
 	}
 
+	if prefixed {
+		fmt.Printf("opcode: 0xCB 0x%x", opcode)
+	} else {
+		fmt.Printf("opcode: 0x%x", opcode)
+	}
+
 	nextAddr := c.execute(opcode, prefixed)
 	c.pc = nextAddr
+}
+
+func NewCPU(mem *Memory) *CPU {
+	return &CPU{
+		registers: &Registers{},
+		memory:    mem,
+	}
 }
 
 // execute matches an opcode to an instruction
@@ -54,6 +67,7 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 
 // readNext reads the opcode at the program counter and increments the program counter
 func (c *CPU) readNext() byte {
+	fmt.Printf("Reading memory at 0x%x\n", c.pc)
 	op := c.memory.Read(c.pc)
 	c.pc++
 	return op
