@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -18,7 +19,7 @@ const (
 )
 
 type Memory struct {
-	mem [0xFFFF]byte
+	mem [0xFFFF + 1]byte
 }
 
 func NewMemory() *Memory {
@@ -40,5 +41,28 @@ func (m *Memory) LoadROM(path string) error {
 	}
 
 	copy(m.mem[:CartridgeROM], data)
+
+	m.GetCartTitle()
+	m.GetLicenseeCode()
+	m.GetCartidgeType()
+	fmt.Println("memory len", len(m.mem))
 	return nil
+}
+
+func (m *Memory) GetCartTitle() {
+	title := m.mem[0x0134:0x0143]
+
+	fmt.Println(string(title))
+}
+
+func (m *Memory) GetLicenseeCode() {
+	code := m.mem[0x0144:0x0145]
+
+	fmt.Println(string(code))
+}
+
+func (m *Memory) GetCartidgeType() {
+	t := m.Read(0x0147)
+
+	fmt.Println(t)
 }

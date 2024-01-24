@@ -70,6 +70,17 @@ func (c *CPU) or(reg1 byte, reg2 byte) byte {
 	return total
 }
 
+func (c *CPU) xor(reg1 byte, reg2 byte) byte {
+	r := reg1 ^ reg2
+
+	c.registers.flags.Zero = r == 0
+	c.registers.flags.Subtract = false
+	c.registers.flags.HalfCarry = false
+	c.registers.flags.Carry = false
+
+	return r
+}
+
 func (c *CPU) cp(reg1 byte, reg2 byte) {
 	c.registers.flags.Zero = reg1 == reg2
 	c.registers.flags.Subtract = true
@@ -87,6 +98,10 @@ func (c *CPU) inc(reg byte) byte {
 	return total
 }
 
+func (c *CPU) inc16(reg uint16) uint16 {
+	return reg - 1
+}
+
 func (c *CPU) dec(reg byte) byte {
 	total := reg - 1
 
@@ -95,6 +110,10 @@ func (c *CPU) dec(reg byte) byte {
 	c.registers.flags.HalfCarry = reg&0x0F == 0
 
 	return total
+}
+
+func (c *CPU) dec16(reg uint16) uint16 {
+	return reg - 1
 }
 
 func (c *CPU) add16(reg1 uint16, reg2 uint16) uint16 {
@@ -142,12 +161,59 @@ func (c *CPU) call() {
 	c.jump(next)
 }
 
+func (c *CPU) rst(dest uint16) {
+	c.push(c.pc)
+	c.jump(0x00 + dest)
+}
+
 func (c *CPU) ret() {
 	c.jump(c.pop())
 }
 
 func (c *CPU) halt() {
 	c.halted = true
+}
+
+// rr rotates val right through carry flag
+func (c *CPU) rr(val byte) byte {
+	newC := val & 1
+	oldC := boolToByte(c.registers.flags.Carry)
+	r := (val >> 1) | (oldC << 7)
+
+	c.registers.flags.Zero = r == 0
+	c.registers.flags.Subtract = false
+	c.registers.flags.HalfCarry = false
+	c.registers.flags.Carry = newC == 1
+
+	return r
+}
+
+func (c *CPU) rra() byte {
+	var carry byte
+	if c.registers.flags.Carry {
+		carry = 0x80
+	}
+
+	r := c.registers.a>>1 | carry
+
+	c.registers.flags.Zero = false
+	c.registers.flags.Subtract = false
+	c.registers.flags.HalfCarry = false
+	c.registers.flags.Carry = (c.registers.a & 1) == 1
+
+	return r
+}
+
+// srl shift val right into carry, returns 0 MSB val
+func (c *CPU) srl(val byte) byte {
+	r := val >> 1
+
+	c.registers.flags.Zero = r == 0
+	c.registers.flags.Subtract = false
+	c.registers.flags.HalfCarry = false
+	c.registers.flags.Carry = (val & 1) == 1
+
+	return r
 }
 
 func boolToByte(b bool) byte {

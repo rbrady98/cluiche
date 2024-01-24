@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Gameboy struct {
 	cpu    *CPU
@@ -24,11 +27,14 @@ func NewGameboy(romPath string) (*Gameboy, error) {
 }
 
 func (g *Gameboy) Run() {
-	frametime := 1 * time.Second
+	frametime := 10 * time.Millisecond
 	ticker := time.NewTicker(frametime)
+	c := 0
 
 	for range ticker.C {
+		fmt.Println("Ticks:", c)
 		g.Update()
+		c++
 	}
 }
 

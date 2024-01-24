@@ -19,6 +19,19 @@ type Registers struct {
 	flags FlagRegisters
 }
 
+func NewRegisters() *Registers {
+	return &Registers{
+		a: 0x01,
+		b: 0x00,
+		c: 0x13,
+		d: 0x00,
+		e: 0xd8,
+		h: 0x01,
+		l: 0x4d,
+		f: 0x01,
+	}
+}
+
 func (r *Registers) getAF() uint16 {
 	return uint16(r.a)<<8 | uint16(r.f)
 }

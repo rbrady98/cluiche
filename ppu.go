@@ -1,0 +1,83 @@
+package main
+
+const (
+	ScreenWidth  = 160
+	ScreenHeight = 144
+
+	Mode0 int = iota // Horizontal Blank
+	Mode1            // Vertical Blank
+	Mode2            // OAM Scan
+	Mode3            // Drawing
+
+	// Registers
+	LCDC uint16 = 0xFF40 // LCD Control register
+	LY   uint16 = 0xFF44 // LCD Y coordinate
+	STAT uint16 = 0xFF41 // LCD status register
+)
+
+type PPU struct {
+	mem  *Memory
+	dots int
+}
+
+// Update
+func (p *PPU) Update(cycles int) {
+	status := p.mem.Read(STAT)
+	mode := getMode(status)
+	line := p.getLine()
+
+	p.dots += cycles
+
+	switch mode {
+	case Mode2:
+		// OAM Read
+		if p.dots >= 80 {
+			// move to drawing
+			p.setMode(Mode3)
+			p.dots = 0
+		}
+
+	case Mode3:
+		// drawing
+		if p.dots >= 172 {
+			// move to h blank
+			p.setMode(Mode0)
+			p.dots = 0
+
+			// draw the scanline as we finish the mode
+		}
+
+	case Mode0:
+		if p.dots >= 204 {
+			p.dots = 0
+			p.setLine(line + 1)
+		}
+
+	case Mode1: // V Blank
+		if p.dots >= 456 {
+			p.dots = 0
+
+			if line == 153 {
+				p.setLine(0)
+			} else {
+				p.setLine(line + 1)
+			}
+		}
+	}
+}
+
+func getMode(stat byte) int {
+	return int(stat & 0xFC)
+}
+
+func (p *PPU) setMode(mode int) int {
+	return 0
+}
+
+func (p *PPU) getLine() int {
+	return int(p.mem.Read(LY))
+}
+
+func (p *PPU) setLine(line int) {
+	p.mem.Write(LY, byte(line))
+}
