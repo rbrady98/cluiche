@@ -57,6 +57,8 @@ func (p *PPU) Update(cycles int) {
 		if p.dots >= 456 {
 			p.dots = 0
 
+			// TODO: after the vblank is finished we have fully rendered a frame
+			// set the current line to 0, push the framebuffer to the screen
 			if line == 153 {
 				p.setLine(0)
 			} else {
@@ -64,6 +66,20 @@ func (p *PPU) Update(cycles int) {
 			}
 		}
 	}
+
+	// TODO: set the new status back into the status register
+}
+
+func (p *PPU) RenderBackground() {}
+func (p *PPU) RenderSprites()    {}
+func (p *PPU) getTilePatternBaseAddress(control byte) uint16 {
+	var base uint16 = 0x8000
+
+	if TestBit(control, 4) {
+		base = 0x8800
+	}
+
+	return base
 }
 
 func getMode(stat byte) int {

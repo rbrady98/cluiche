@@ -8,15 +8,14 @@ const (
 )
 
 type Registers struct {
-	a     byte
-	b     byte
-	c     byte
-	d     byte
-	e     byte
-	f     byte // TODO: this should be flag registers
-	h     byte
-	l     byte
-	flags FlagRegisters
+	a byte
+	b byte
+	c byte
+	d byte
+	e byte
+	f *FlagRegisters
+	h byte
+	l byte
 }
 
 func NewRegisters() *Registers {
@@ -28,17 +27,17 @@ func NewRegisters() *Registers {
 		e: 0xd8,
 		h: 0x01,
 		l: 0x4d,
-		f: 0x01,
+		f: flagsFromByte(0x01),
 	}
 }
 
 func (r *Registers) getAF() uint16 {
-	return uint16(r.a)<<8 | uint16(r.f)
+	return uint16(r.a)<<8 | uint16(r.f.toByte())
 }
 
 func (r *Registers) setAF(value uint16) {
 	r.a = byte((value & 0xFF00) >> 8)
-	r.f = byte((value & 0xFF) >> 8)
+	r.f = flagsFromByte(byte((value & 0xFF) >> 8))
 }
 
 func (r *Registers) getBC() uint16 {
@@ -93,7 +92,7 @@ func (f *FlagRegisters) toByte() byte {
 	return b
 }
 
-func (f *FlagRegisters) fromByte(value byte) *FlagRegisters {
+func flagsFromByte(value byte) *FlagRegisters {
 	carry := (value>>CarryFlagBitPosition)&0b1 == 1
 	halfCarry := (value>>HalfCarryFlagBitPosition)&0b1 == 1
 	subtract := (value>>SubtractFlagBitPosition)&0b1 == 1
