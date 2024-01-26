@@ -4,23 +4,23 @@ package main
 func (c *CPU) add(reg1 byte, reg2 byte) byte {
 	total := int16(reg1) + int16(reg2)
 
-	c.registers.flags.Zero = (byte(total) == 0)
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = ((reg1&0xF)+(reg2&0xF) > 0xF)
-	c.registers.flags.Carry = total > 0xFF
+	c.registers.f.Zero = (byte(total) == 0)
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = ((reg1&0xF)+(reg2&0xF) > 0xF)
+	c.registers.f.Carry = total > 0xFF
 
 	return byte(total)
 }
 
 // Perform ADD instruction and set the carry flag
 func (c *CPU) addC(reg1 byte, reg2 byte) byte {
-	carry := int16(boolToByte(c.registers.flags.Carry))
+	carry := int16(boolToByte(c.registers.f.Carry))
 	total := int16(reg1) + int16(reg2) + carry
 
-	c.registers.flags.Zero = (byte(total) == 0)
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = ((reg1&0xF)+(reg2&0xF) > 0xF)
-	c.registers.flags.Carry = total > 0xFF
+	c.registers.f.Zero = (byte(total) == 0)
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = ((reg1&0xF)+(reg2&0xF) > 0xF)
+	c.registers.f.Carry = total > 0xFF
 
 	return byte(total)
 }
@@ -28,22 +28,22 @@ func (c *CPU) addC(reg1 byte, reg2 byte) byte {
 func (c *CPU) sub(reg1 byte, reg2 byte) byte {
 	total := int16(reg1) - int16(reg2)
 
-	c.registers.flags.Zero = (total == 0)
-	c.registers.flags.Subtract = true
-	c.registers.flags.HalfCarry = int16(reg1&0x0F)-int16(reg2&0xF) < 0
-	c.registers.flags.Carry = total < 0
+	c.registers.f.Zero = (total == 0)
+	c.registers.f.Subtract = true
+	c.registers.f.HalfCarry = int16(reg1&0x0F)-int16(reg2&0xF) < 0
+	c.registers.f.Carry = total < 0
 
 	return byte(total)
 }
 
 func (c *CPU) subC(reg1 byte, reg2 byte) byte {
-	carry := int16(boolToByte(c.registers.flags.Carry))
+	carry := int16(boolToByte(c.registers.f.Carry))
 	total := int16(reg1) - int16(reg2) - carry
 
-	c.registers.flags.Zero = (total == 0)
-	c.registers.flags.Subtract = true
-	c.registers.flags.HalfCarry = int16(reg1&0x0F)-int16(reg2&0xF)-carry < 0
-	c.registers.flags.Carry = total < 0
+	c.registers.f.Zero = (total == 0)
+	c.registers.f.Subtract = true
+	c.registers.f.HalfCarry = int16(reg1&0x0F)-int16(reg2&0xF)-carry < 0
+	c.registers.f.Carry = total < 0
 
 	return byte(total)
 }
@@ -51,10 +51,10 @@ func (c *CPU) subC(reg1 byte, reg2 byte) byte {
 func (c *CPU) and(reg1 byte, reg2 byte) byte {
 	total := reg1 & reg2
 
-	c.registers.flags.Zero = (total == 0)
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = true
-	c.registers.flags.Carry = false
+	c.registers.f.Zero = (total == 0)
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = true
+	c.registers.f.Carry = false
 
 	return total
 }
@@ -62,10 +62,10 @@ func (c *CPU) and(reg1 byte, reg2 byte) byte {
 func (c *CPU) or(reg1 byte, reg2 byte) byte {
 	total := reg1 | reg2
 
-	c.registers.flags.Zero = (total == 0)
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = false
-	c.registers.flags.Carry = false
+	c.registers.f.Zero = (total == 0)
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = false
 
 	return total
 }
@@ -73,27 +73,27 @@ func (c *CPU) or(reg1 byte, reg2 byte) byte {
 func (c *CPU) xor(reg1 byte, reg2 byte) byte {
 	r := reg1 ^ reg2
 
-	c.registers.flags.Zero = r == 0
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = false
-	c.registers.flags.Carry = false
+	c.registers.f.Zero = r == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = false
 
 	return r
 }
 
 func (c *CPU) cp(reg1 byte, reg2 byte) {
-	c.registers.flags.Zero = reg1 == reg2
-	c.registers.flags.Subtract = true
-	c.registers.flags.HalfCarry = false
-	c.registers.flags.Carry = reg1 < reg2
+	c.registers.f.Zero = reg1 == reg2
+	c.registers.f.Subtract = true
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = reg1 < reg2
 }
 
 func (c *CPU) inc(reg byte) byte {
 	total := reg + 1
 
-	c.registers.flags.Zero = total == 0
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = ((reg&0xF)+1 > 0xF)
+	c.registers.f.Zero = total == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = ((reg&0xF)+1 > 0xF)
 
 	return total
 }
@@ -105,9 +105,9 @@ func (c *CPU) inc16(reg uint16) uint16 {
 func (c *CPU) dec(reg byte) byte {
 	total := reg - 1
 
-	c.registers.flags.Zero = total == 0
-	c.registers.flags.Subtract = true
-	c.registers.flags.HalfCarry = reg&0x0F == 0
+	c.registers.f.Zero = total == 0
+	c.registers.f.Subtract = true
+	c.registers.f.HalfCarry = reg&0x0F == 0
 
 	return total
 }
@@ -119,9 +119,9 @@ func (c *CPU) dec16(reg uint16) uint16 {
 func (c *CPU) add16(reg1 uint16, reg2 uint16) uint16 {
 	total := int32(reg1) + int32(reg2)
 
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = int32(reg1&0xFFF) > (total & 0xFFF)
-	c.registers.flags.Carry = total > 0xFFFF
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = int32(reg1&0xFFF) > (total & 0xFFF)
+	c.registers.f.Carry = total > 0xFFFF
 
 	return uint16(total)
 }
@@ -129,9 +129,9 @@ func (c *CPU) add16(reg1 uint16, reg2 uint16) uint16 {
 func (c *CPU) signedAdd16(reg1 uint16, reg2 uint16) uint16 {
 	total := int32(reg1) + int32(reg2)
 
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = int32(reg1&0xFFF) > (total & 0xFFF)
-	c.registers.flags.Carry = total > 0xFFFF
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = int32(reg1&0xFFF) > (total & 0xFFF)
+	c.registers.f.Carry = total > 0xFFFF
 
 	return uint16(total)
 }
@@ -155,8 +155,7 @@ func (c *CPU) pop() uint16 {
 	return b1 | b2
 }
 
-func (c *CPU) call() {
-	next := c.readNext16()
+func (c *CPU) call(next uint16) {
 	c.push(c.pc)
 	c.jump(next)
 }
@@ -177,29 +176,29 @@ func (c *CPU) halt() {
 // rr rotates val right through carry flag
 func (c *CPU) rr(val byte) byte {
 	newC := val & 1
-	oldC := boolToByte(c.registers.flags.Carry)
+	oldC := boolToByte(c.registers.f.Carry)
 	r := (val >> 1) | (oldC << 7)
 
-	c.registers.flags.Zero = r == 0
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = false
-	c.registers.flags.Carry = newC == 1
+	c.registers.f.Zero = r == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = newC == 1
 
 	return r
 }
 
 func (c *CPU) rra() byte {
 	var carry byte
-	if c.registers.flags.Carry {
+	if c.registers.f.Carry {
 		carry = 0x80
 	}
 
 	r := c.registers.a>>1 | carry
 
-	c.registers.flags.Zero = false
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = false
-	c.registers.flags.Carry = (c.registers.a & 1) == 1
+	c.registers.f.Zero = false
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = (c.registers.a & 1) == 1
 
 	return r
 }
@@ -208,10 +207,10 @@ func (c *CPU) rra() byte {
 func (c *CPU) srl(val byte) byte {
 	r := val >> 1
 
-	c.registers.flags.Zero = r == 0
-	c.registers.flags.Subtract = false
-	c.registers.flags.HalfCarry = false
-	c.registers.flags.Carry = (val & 1) == 1
+	c.registers.f.Zero = r == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = (val & 1) == 1
 
 	return r
 }

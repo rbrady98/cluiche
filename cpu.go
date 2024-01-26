@@ -15,14 +15,16 @@ type CPU struct {
 
 func NewCPU(mem *Memory) *CPU {
 	return &CPU{
-		registers: &Registers{},
+		registers: NewRegisters(),
 		memory:    mem,
 		pc:        0x0100,
 		sp:        0xFFFE,
 	}
 }
 
-func (c *CPU) tick() {
+// Update ticks the cpu, reading the next instruction and executing it
+func (c *CPU) Update() {
+	fmt.Println("pc:", c.pc)
 	opcode := c.readNext()
 	prefixed := opcode == 0xCB
 	if prefixed {
@@ -50,8 +52,8 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.readNext()
 		case 0x2F: // CPL
 			c.registers.a = ^c.registers.a
-			c.registers.flags.Subtract = true
-			c.registers.flags.HalfCarry = true
+			c.registers.f.Subtract = true
+			c.registers.f.HalfCarry = true
 		case 0x01: // LD BC,nn
 			c.registers.setBC(c.readNext16())
 		case 0x11: // LD DE,nn
@@ -98,19 +100,19 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0x18: // JR n
 			c.jump(c.pc + uint16(c.readNext()))
 		case 0x20: // JR NZ
-			if !c.registers.flags.Zero {
+			if !c.registers.f.Zero {
 				c.jump(c.pc + uint16(c.readNext()))
 			}
 		case 0x28: // JR Z
-			if c.registers.flags.Zero {
+			if c.registers.f.Zero {
 				c.jump(c.pc + uint16(c.readNext()))
 			}
 		case 0x30: // JR NC
-			if !c.registers.flags.Carry {
+			if !c.registers.f.Carry {
 				c.jump(c.pc + uint16(c.readNext()))
 			}
 		case 0x38: // JR C
-			if c.registers.flags.Carry {
+			if c.registers.f.Carry {
 				c.jump(c.pc + uint16(c.readNext()))
 			}
 		case 0xf3: // DI
@@ -134,8 +136,12 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0x34: // INC (HL)
 			v := c.memory.Read(c.registers.getHL())
 			c.memory.Write(c.registers.getHL(), c.inc(v))
-		case 0xc9: // RET
+		case 0xC9: // RET
 			c.ret()
+		case 0xD8: // RET C
+			if c.registers.f.Carry {
+				c.ret()
+			}
 		case 0xF5: // PUSH AF
 			c.push(c.registers.getAF())
 		case 0xC5: // PUSH BC
@@ -160,8 +166,25 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.setHL(c.inc16(c.registers.getHL()))
 		case 0x33: // INC SP
 			c.sp = (c.inc16(c.sp))
-		case 0xA0: // AND A,A
+		case 0xA7: // AND A
 			c.registers.a = c.and(c.registers.a, c.registers.a)
+		case 0xA0: // AND B
+			c.registers.a = c.and(c.registers.a, c.registers.b)
+		case 0xA1: // AND C
+			c.registers.a = c.and(c.registers.a, c.registers.c)
+		case 0xA2: // AND D
+			c.registers.a = c.and(c.registers.a, c.registers.d)
+		case 0xA3: // AND E
+			c.registers.a = c.and(c.registers.a, c.registers.e)
+		case 0xA4: // AND H
+			c.registers.a = c.and(c.registers.a, c.registers.h)
+		case 0xA5: // AND L
+			c.registers.a = c.and(c.registers.a, c.registers.l)
+		case 0xA6: // AND (HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.registers.a = c.and(c.registers.a, v)
+		case 0xE6: // AND n
+			c.registers.a = c.and(c.registers.a, c.readNext())
 		case 0xAF: // XOR A
 			c.registers.a = c.xor(c.registers.a, c.registers.a)
 		case 0xA8: // XOR B
@@ -267,7 +290,29 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0xFF: // RST 0x38
 			c.rst(0x38)
 		case 0xCD: // CALL nn
-			c.call()
+			next := c.readNext16()
+			c.call(next)
+		case 0xC4: // CALL NZ,nn
+			next := c.readNext16()
+			if !c.registers.f.Zero {
+				c.call(next)
+			}
+		case 0xCC: // CALL Z,nn
+			next := c.readNext16()
+			if c.registers.f.Zero {
+				fmt.Println("jumping to:", next)
+				c.call(next)
+			}
+		case 0xD4: // CALL Nc,nn
+			next := c.readNext16()
+			if !c.registers.f.Carry {
+				c.call(next)
+			}
+		case 0xDC: // CALL C,nn
+			next := c.readNext16()
+			if c.registers.f.Carry {
+				c.call(next)
+			}
 		case 0x06: // LD B,n
 			c.registers.b = c.readNext()
 		case 0x0E: // LD C,n
@@ -394,6 +439,8 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.memory.Write(c.registers.getHL(), c.readNext())
 		case 0x1F:
 			c.registers.a = c.rra()
+		case 0x08:
+			c.sp = c.readNext16()
 		default:
 			panic(fmt.Sprintf("unimplemented opcode: %#2x\n", op))
 		}
@@ -445,7 +492,6 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 
 // readNext reads the opcode at the program counter and increments the program counter
 func (c *CPU) readNext() byte {
-	fmt.Printf("Reading memory at 0x%x\n", c.pc)
 	op := c.memory.Read(c.pc)
 	c.pc++
 	return op

@@ -77,16 +77,16 @@ type FlagRegisters struct {
 func (f *FlagRegisters) toByte() byte {
 	var b byte
 	if f.Carry {
-		b = b | 1<<CarryFlagBitPosition
+		b = b | (1 << CarryFlagBitPosition)
 	}
 	if f.HalfCarry {
-		b = b | 1<<HalfCarryFlagBitPosition
+		b = b | (1 << HalfCarryFlagBitPosition)
 	}
 	if f.Subtract {
-		b = b | 1<<SubtractFlagBitPosition
+		b = b | (1 << SubtractFlagBitPosition)
 	}
 	if f.Zero {
-		b = b | 1<<ZeroFlagBitPosition
+		b = b | (1 << ZeroFlagBitPosition)
 	}
 
 	return b

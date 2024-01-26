@@ -64,6 +64,9 @@ func (m *Memory) Read(addr uint16) byte {
 }
 
 func (m *Memory) Write(addr uint16, val byte) {
+	if addr == 0xFF02 && val == 0x81 {
+		fmt.Println(string(m.mem[0xFF01]))
+	}
 	m.mem[addr] = val
 }
 
@@ -75,17 +78,16 @@ func (m *Memory) LoadROM(path string) error {
 
 	copy(m.mem[:CartridgeROM], data)
 
-	m.GetCartTitle()
-	m.GetLicenseeCode()
-	m.GetCartidgeType()
 	fmt.Println("memory len", len(m.mem))
+	fmt.Println("memory", m.mem[0x100:0x200])
+	panic("hi")
 	return nil
 }
 
-func (m *Memory) GetCartTitle() {
+func (m *Memory) GetCartTitle() string {
 	title := m.mem[0x0134:0x0143]
 
-	fmt.Println(string(title))
+	return string(title)
 }
 
 func (m *Memory) GetLicenseeCode() {
