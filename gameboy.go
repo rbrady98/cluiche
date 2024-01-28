@@ -1,5 +1,11 @@
 package main
 
+import (
+	// "bufio"
+	// "fmt"
+	// "os"
+)
+
 const CyclesPerFrame = 70224
 
 type Gameboy struct {
@@ -36,13 +42,18 @@ func (g *Gameboy) Update() {
 	var frameCycles int
 
 	// TODO: track cycles spent on operation
-	for frameCycles < CyclesPerFrame/4 {
+	for frameCycles < CyclesPerFrame {
 		// fmt.Println(frameCycles)
 		g.cpu.Update()
-		g.ppu.Update(4)
+    g.ppu.Update(1)
+		// if frameCycles%1000 == 0 {
+		//     fmt.Println(g.cpu.registers)
+		// 	fmt.Println("Waiting for enter key to conitnue")
+		// 	bufio.NewReader(os.Stdin).ReadBytes('\n')
+		// }
 		// tick the timers
 
-		frameCycles += 4
+		frameCycles += 1
 	}
 }
 

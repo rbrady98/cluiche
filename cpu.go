@@ -24,18 +24,18 @@ func NewCPU(mem *Memory) *CPU {
 
 // Update ticks the cpu, reading the next instruction and executing it
 func (c *CPU) Update() {
-	fmt.Println("pc:", c.pc)
+	// fmt.Printf("pc: %x\n", c.pc)
 	opcode := c.readNext()
 	prefixed := opcode == 0xCB
 	if prefixed {
 		opcode = c.readNext()
 	}
 
-	if prefixed {
-		fmt.Printf("opcode: 0xCB 0x%x\n", opcode)
-	} else {
-		fmt.Printf("opcode: 0x%x\n", opcode)
-	}
+	// if prefixed {
+	// 	fmt.Printf("opcode: 0xCB 0x%x\n", opcode)
+	// } else {
+	// 	fmt.Printf("opcode: 0x%x\n", opcode)
+	// }
 
 	nextAddr := c.execute(opcode, prefixed)
 	c.pc = nextAddr
@@ -62,6 +62,14 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.setHL(c.readNext16())
 		case 0x31: // LD SP,nn
 			c.sp = c.readNext16()
+		case 0xF9: // LD SP,HL
+			c.sp = c.registers.getHL()
+		case 0xF8: // LD HL, SP=n
+			addr := c.sp + uint16(int8(c.readNext()))
+			c.registers.setHL(addr)
+
+			c.registers.f.Zero = false
+			c.registers.f.Subtract = false
 		case 0x7F: // LD A,A
 			// self assign just skip
 		case 0x47: // LD B,A
@@ -95,25 +103,61 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0xF0: // LDH A,n = LD A,(0xFF00+n)
 			n := c.readNext()
 			c.registers.a = c.memory.Read(0xFF00 + uint16(n))
+		case 0xF2: // LD A,(C)
+			n := 0xFF00 + uint16(c.registers.c)
+			c.registers.a = c.memory.Read(n)
+		case 0xE2: // LD (C),A
+			c.memory.Write(0xFF00+uint16(c.registers.c), c.registers.a)
 		case 0xC3: // JP nn
 			c.jump(c.readNext16())
-		case 0x18: // JR n
-			c.jump(c.pc + uint16(c.readNext()))
-		case 0x20: // JR NZ
+		case 0xC2: // JP NZ, nn
+			addr := c.readNext16()
 			if !c.registers.f.Zero {
-				c.jump(c.pc + uint16(c.readNext()))
+				c.jump(addr)
+			}
+		case 0xCA: // JP Z, nn
+			addr := c.readNext16()
+			if c.registers.f.Zero {
+				c.jump(addr)
+			}
+		case 0xD2: // JP NC, nn
+			addr := c.readNext16()
+			if !c.registers.f.Carry {
+				c.jump(addr)
+			}
+		case 0xDA: // JP C, nn
+			addr := c.readNext16()
+			if c.registers.f.Carry {
+				c.jump(addr)
+			}
+		case 0xE9: // JP (HL)
+			c.jump(c.registers.getHL())
+		case 0x18: // JR n
+			addr := int16(c.pc) + int16(int8(c.readNext()))
+			c.jump(uint16(addr))
+		case 0x20: // JR NZ
+			v := int8(c.readNext())
+			if !c.registers.f.Zero {
+				addr := int16(c.pc) + int16(v)
+				c.jump(uint16(addr))
 			}
 		case 0x28: // JR Z
+			v := int8(c.readNext())
 			if c.registers.f.Zero {
-				c.jump(c.pc + uint16(c.readNext()))
+				addr := int16(c.pc) + int16(v)
+				c.jump(uint16(addr))
 			}
 		case 0x30: // JR NC
+			v := int8(c.readNext())
 			if !c.registers.f.Carry {
-				c.jump(c.pc + uint16(c.readNext()))
+				addr := int16(c.pc) + int16(v)
+				c.jump(uint16(addr))
 			}
 		case 0x38: // JR C
+			v := int8(c.readNext())
 			if c.registers.f.Carry {
-				c.jump(c.pc + uint16(c.readNext()))
+				addr := int16(c.pc) + int16(v)
+				c.jump(uint16(addr))
 			}
 		case 0xf3: // DI
 			c.interruptsEnabled = false
@@ -138,6 +182,18 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.memory.Write(c.registers.getHL(), c.inc(v))
 		case 0xC9: // RET
 			c.ret()
+		case 0xC0: // RET NZ
+			if !c.registers.f.Zero {
+				c.ret()
+			}
+		case 0xC8: // RET Z
+			if c.registers.f.Zero {
+				c.ret()
+			}
+		case 0xD0: // RET NC
+			if !c.registers.f.Carry {
+				c.ret()
+			}
 		case 0xD8: // RET C
 			if c.registers.f.Carry {
 				c.ret()
@@ -204,6 +260,25 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.a = c.xor(c.registers.a, v)
 		case 0xEE: // XOR n
 			c.registers.a = c.xor(c.registers.a, c.readNext())
+		case 0xB7: // OR A
+			c.registers.a = c.or(c.registers.a, c.registers.a)
+		case 0xB0: // OR B
+			c.registers.a = c.or(c.registers.a, c.registers.b)
+		case 0xB1: // OR C
+			c.registers.a = c.or(c.registers.a, c.registers.c)
+		case 0xB2: // OR D
+			c.registers.a = c.or(c.registers.a, c.registers.d)
+		case 0xB3: // OR E
+			c.registers.a = c.or(c.registers.a, c.registers.e)
+		case 0xB4: // OR H
+			c.registers.a = c.or(c.registers.a, c.registers.h)
+		case 0xB5: // OR L
+			c.registers.a = c.or(c.registers.a, c.registers.l)
+		case 0xB6: // OR (HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.registers.a = c.or(c.registers.a, v)
+		case 0xF6: // OR n
+			c.registers.a = c.or(c.registers.a, c.readNext())
 		case 0x87: // ADD A,A
 			c.registers.a = c.add(c.registers.a, c.registers.a)
 		case 0x80: // ADD A,B
@@ -300,7 +375,6 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0xCC: // CALL Z,nn
 			next := c.readNext16()
 			if c.registers.f.Zero {
-				fmt.Println("jumping to:", next)
 				c.call(next)
 			}
 		case 0xD4: // CALL Nc,nn
@@ -337,8 +411,14 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.a = c.registers.h
 		case 0x7D: // LD A,L
 			c.registers.a = c.registers.l
+		case 0x0A: // LD A,BC
+			c.registers.a = c.memory.Read(c.registers.getBC())
+		case 0x1A: // LD A,DE
+			c.registers.a = c.memory.Read(c.registers.getDE())
 		case 0x7E: // LD A,HL
 			c.registers.a = c.memory.Read(c.registers.getHL())
+		case 0xFA: // LD A,nn
+			c.registers.a = c.memory.Read(c.readNext16())
 		case 0x40: // LD B,B
 			// ignore self assign
 		case 0x41: // LD B,C
@@ -423,6 +503,12 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			// ignore self assign
 		case 0x6E: // LD L,HL
 			c.registers.l = c.memory.Read(c.registers.getHL())
+		case 0x22: // LD (HLI),A
+			c.memory.Write(c.registers.getHL(), c.registers.a)
+			c.registers.setHL(c.inc16(c.registers.getHL()))
+		case 0x32: // LD (HLD),A
+			c.memory.Write(c.registers.getHL(), c.registers.a)
+			c.registers.setHL(c.dec16(c.registers.getHL()))
 		case 0x70: // LD HL,B
 			c.memory.Write(c.registers.getHL(), c.registers.b)
 		case 0x71: // LD HL,C
@@ -441,6 +527,49 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.a = c.rra()
 		case 0x08:
 			c.sp = c.readNext16()
+		case 0xBF: // CP A
+			c.cp(c.registers.a, c.registers.a)
+		case 0xB8: // CP B
+			c.cp(c.registers.b, c.registers.a)
+		case 0xB9: // CP C
+			c.cp(c.registers.c, c.registers.a)
+		case 0xBA: // CP D
+			c.cp(c.registers.d, c.registers.a)
+		case 0xBB: // CP E
+			c.cp(c.registers.e, c.registers.a)
+		case 0xBC: // CP H
+			c.cp(c.registers.h, c.registers.a)
+		case 0xBD: // CP L
+			c.cp(c.registers.l, c.registers.a)
+		case 0xBE: // CP L
+			v := c.memory.Read(c.registers.getHL())
+			c.cp(v, c.registers.a)
+		case 0xFE: // CP n
+			c.cp(c.readNext(), c.registers.a)
+		case 0x97: // SUB A
+			c.registers.a = c.sub(c.registers.a, c.registers.a)
+		case 0x90: // SUB B
+			c.registers.a = c.sub(c.registers.a, c.registers.b)
+		case 0x91: // SUB C
+			c.registers.a = c.sub(c.registers.a, c.registers.c)
+		case 0x92: // SUB D
+			c.registers.a = c.sub(c.registers.a, c.registers.d)
+		case 0x93: // SUB E
+			c.registers.a = c.sub(c.registers.a, c.registers.e)
+		case 0x94: // SUB H
+			c.registers.a = c.sub(c.registers.a, c.registers.h)
+		case 0x95: // SUB L
+			c.registers.a = c.sub(c.registers.a, c.registers.l)
+		case 0x96: // SUB (HL)
+			c.registers.a = c.sub(c.registers.a, c.memory.Read(c.registers.getHL()))
+		case 0xD6: // SUB n
+			c.registers.a = c.sub(c.registers.a, c.readNext())
+		case 0x27: // DAA
+			c.daa()
+		case 0x37: // SCF
+			c.registers.f.Carry = true
+		case 0x07:
+			c.rlca()
 		default:
 			panic(fmt.Sprintf("unimplemented opcode: %#2x\n", op))
 		}
@@ -482,8 +611,24 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0x1E: // RR (HL)
 			v := c.memory.Read(c.registers.getHL())
 			c.memory.Write(c.registers.getHL(), c.rr(v))
+		case 0x37: // SWAO A
+			c.registers.a = c.swap(c.registers.a)
+		case 0x30: // SWAO B
+			c.registers.b = c.swap(c.registers.b)
+		case 0x31: // SWAO C
+			c.registers.c = c.swap(c.registers.c)
+		case 0x32: // SWAO D
+			c.registers.d = c.swap(c.registers.d)
+		case 0x33: // SWAO E
+			c.registers.e = c.swap(c.registers.e)
+		case 0x34: // SWAO H
+			c.registers.h = c.swap(c.registers.h)
+		case 0x35: // SWAO L
+			c.registers.l = c.swap(c.registers.l)
+		case 0x36: // SWAO (HL)
+			c.memory.Write(c.registers.getHL(), c.swap(c.memory.Read(c.registers.getHL())))
 		default:
-			panic(fmt.Sprintf("unimplemented opcode: %#2x\n", op))
+			panic(fmt.Sprintf("unimplemented opcode: CB %#2x\n", op))
 		}
 	}
 

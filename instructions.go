@@ -84,8 +84,8 @@ func (c *CPU) xor(reg1 byte, reg2 byte) byte {
 func (c *CPU) cp(reg1 byte, reg2 byte) {
 	c.registers.f.Zero = reg1 == reg2
 	c.registers.f.Subtract = true
-	c.registers.f.HalfCarry = false
-	c.registers.f.Carry = reg1 < reg2
+	c.registers.f.HalfCarry = (reg1 & 0x0f) > (reg2 & 0x0f)
+	c.registers.f.Carry = reg1 > reg2
 }
 
 func (c *CPU) inc(reg byte) byte {
@@ -99,7 +99,7 @@ func (c *CPU) inc(reg byte) byte {
 }
 
 func (c *CPU) inc16(reg uint16) uint16 {
-	return reg - 1
+	return reg + 1
 }
 
 func (c *CPU) dec(reg byte) byte {
@@ -213,6 +213,58 @@ func (c *CPU) srl(val byte) byte {
 	c.registers.f.Carry = (val & 1) == 1
 
 	return r
+}
+
+func (c *CPU) rlca() {
+	v := c.registers.a
+	res := (v << 1) | (v >> 7)
+
+	c.registers.f.Zero = res == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = v > 0x7F
+
+	c.registers.a = res
+}
+
+func (c *CPU) swap(val byte) byte {
+	s := ((val & 0xF) << 4) | ((val & 0xF0) >> 4)
+
+	c.registers.f.Zero = s == 0
+
+	return s
+}
+
+func (c *CPU) daa() {
+	a := c.registers.a
+	half := c.registers.f.HalfCarry
+	carry := c.registers.f.Carry
+	sub := c.registers.f.Subtract
+
+	if !sub {
+		if carry || a > 0x99 {
+			a += 0x60
+			c.registers.f.Carry = true
+		}
+
+		if half || (a&0x0F > 0x09) {
+			a += 0x6
+		}
+	} else {
+		if carry {
+			a -= 0x60
+		}
+
+		if half {
+			a -= 0x06
+		}
+	}
+
+	c.registers.f.Zero = a == 0
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = a > 0x99
+
+	c.registers.a = a
 }
 
 func boolToByte(b bool) byte {

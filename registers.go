@@ -1,5 +1,9 @@
 package main
 
+import (
+	"fmt"
+)
+
 const (
 	CarryFlagBitPosition     byte = 4
 	HalfCarryFlagBitPosition byte = 5
@@ -37,7 +41,7 @@ func (r *Registers) getAF() uint16 {
 
 func (r *Registers) setAF(value uint16) {
 	r.a = byte((value & 0xFF00) >> 8)
-	r.f = flagsFromByte(byte((value & 0xFF) >> 8))
+	r.f = flagsFromByte(byte((value & 0xFF)))
 }
 
 func (r *Registers) getBC() uint16 {
@@ -46,7 +50,7 @@ func (r *Registers) getBC() uint16 {
 
 func (r *Registers) setBC(value uint16) {
 	r.b = byte((value & 0xFF00) >> 8)
-	r.c = byte((value & 0xFF) >> 8)
+	r.c = byte((value & 0xFF))
 }
 
 func (r *Registers) getDE() uint16 {
@@ -55,7 +59,7 @@ func (r *Registers) getDE() uint16 {
 
 func (r *Registers) setDE(value uint16) {
 	r.d = byte((value & 0xFF00) >> 8)
-	r.e = byte((value & 0xFF) >> 8)
+	r.e = byte((value & 0xFF))
 }
 
 func (r *Registers) getHL() uint16 {
@@ -64,7 +68,7 @@ func (r *Registers) getHL() uint16 {
 
 func (r *Registers) setHL(value uint16) {
 	r.h = byte((value & 0xFF00) >> 8)
-	r.l = byte((value & 0xFF) >> 8)
+	r.l = byte((value & 0xFF))
 }
 
 type FlagRegisters struct {
@@ -104,4 +108,14 @@ func flagsFromByte(value byte) *FlagRegisters {
 		subtract,
 		zero,
 	}
+}
+
+func (r *Registers) String() string {
+	var s string
+	s += fmt.Sprintf("AF: %x\n", r.getAF())
+	s += fmt.Sprintf("BC: %x\n", r.getBC())
+	s += fmt.Sprintf("DE: %x\n", r.getDE())
+	s += fmt.Sprintf("HL: %x\n", r.getHL())
+
+	return s
 }

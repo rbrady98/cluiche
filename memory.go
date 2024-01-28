@@ -65,7 +65,7 @@ func (m *Memory) Read(addr uint16) byte {
 
 func (m *Memory) Write(addr uint16, val byte) {
 	if addr == 0xFF02 && val == 0x81 {
-		fmt.Println(string(m.mem[0xFF01]))
+		fmt.Print(string(m.mem[0xFF01]))
 	}
 	m.mem[addr] = val
 }
@@ -80,7 +80,6 @@ func (m *Memory) LoadROM(path string) error {
 
 	fmt.Println("memory len", len(m.mem))
 	fmt.Println("memory", m.mem[0x100:0x200])
-	panic("hi")
 	return nil
 }
 

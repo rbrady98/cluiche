@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	game := NewGame(160, 144, "./roms/misc-instrs.gb")
+	game := NewGame(160, 144, "./roms/01-special.gb")
 	ebiten.SetWindowSize(640, 480)
 	// ebiten.SetWindowTitle(gb.GetRomTitle())
 	ebiten.SetTPS(1)
