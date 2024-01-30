@@ -19,7 +19,7 @@ func (c *CPU) addC(reg1 byte, reg2 byte) byte {
 
 	c.registers.f.Zero = (byte(total) == 0)
 	c.registers.f.Subtract = false
-	c.registers.f.HalfCarry = ((reg1&0xF)+(reg2&0xF) > 0xF)
+	c.registers.f.HalfCarry = ((reg1&0xF)+(reg2&0xF)+byte(carry) > 0xF)
 	c.registers.f.Carry = total > 0xFF
 
 	return byte(total)
@@ -40,7 +40,7 @@ func (c *CPU) subC(reg1 byte, reg2 byte) byte {
 	carry := int16(boolToByte(c.registers.f.Carry))
 	total := int16(reg1) - int16(reg2) - carry
 
-	c.registers.f.Zero = (total == 0)
+	c.registers.f.Zero = (byte(total) == 0)
 	c.registers.f.Subtract = true
 	c.registers.f.HalfCarry = int16(reg1&0x0F)-int16(reg2&0xF)-carry < 0
 	c.registers.f.Carry = total < 0
@@ -187,7 +187,7 @@ func (c *CPU) rr(val byte) byte {
 	return r
 }
 
-func (c *CPU) rra() byte {
+func (c *CPU) rra() {
 	var carry byte
 	if c.registers.f.Carry {
 		carry = 0x80
@@ -199,6 +199,29 @@ func (c *CPU) rra() byte {
 	c.registers.f.Subtract = false
 	c.registers.f.HalfCarry = false
 	c.registers.f.Carry = (c.registers.a & 1) == 1
+
+	c.registers.a = r
+}
+
+func (c *CPU) rrca() {
+	v := c.registers.a
+	r := v>>1 | (v&0x1)<<7
+
+	c.registers.f.Zero = false
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = (c.registers.a & 1) == 1
+
+	c.registers.a = r
+}
+
+func (c *CPU) rrc(val byte) byte {
+	r := val>>1 | (val&0x1)<<7
+
+	c.registers.f.Zero = r == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = (val & 1) == 1
 
 	return r
 }
@@ -217,9 +240,44 @@ func (c *CPU) srl(val byte) byte {
 
 func (c *CPU) rlca() {
 	v := c.registers.a
-	res := (v << 1) | (v >> 7)
+	res := byte(v<<1) | (v >> 7)
+
+	c.registers.f.Zero = false
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = v > 0x7F
+
+	c.registers.a = res
+}
+
+func (c *CPU) rlc(val byte) byte {
+	res := (val << 1) | (val >> 7)
 
 	c.registers.f.Zero = res == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	// TODO: maybe should be 0x80
+	c.registers.f.Carry = val > 0x7F
+
+	return res
+}
+
+func (c *CPU) rl(val byte) byte {
+	res := (val << 1) + boolToByte(c.registers.f.Carry)
+
+	c.registers.f.Zero = res == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = val > 0x7F
+
+	return res
+}
+
+func (c *CPU) rla() {
+	v := c.registers.a
+	res := (v << 1) + boolToByte(c.registers.f.Carry)
+
+	c.registers.f.Zero = false
 	c.registers.f.Subtract = false
 	c.registers.f.HalfCarry = false
 	c.registers.f.Carry = v > 0x7F
@@ -231,6 +289,9 @@ func (c *CPU) swap(val byte) byte {
 	s := ((val & 0xF) << 4) | ((val & 0xF0) >> 4)
 
 	c.registers.f.Zero = s == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = false
 
 	return s
 }
@@ -262,9 +323,52 @@ func (c *CPU) daa() {
 
 	c.registers.f.Zero = a == 0
 	c.registers.f.HalfCarry = false
-	c.registers.f.Carry = a > 0x99
 
 	c.registers.a = a
+}
+
+func (c *CPU) ccf() {
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = !c.registers.f.Carry
+}
+
+func (c *CPU) sla(val byte) byte {
+	r := val << 1
+
+	c.registers.f.Zero = r == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = (val & 0x80) > 1
+
+	return r
+}
+
+func (c *CPU) sra(val byte) byte {
+	r := val>>1 | val&0x80
+
+	c.registers.f.Zero = r == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = false
+	c.registers.f.Carry = (val & 0x1) == 1
+
+	return r
+}
+
+func (c *CPU) bit(bit byte, reg byte) {
+	t := (reg >> bit) & 0x1
+
+	c.registers.f.Zero = t == 0
+	c.registers.f.Subtract = false
+	c.registers.f.HalfCarry = true
+}
+
+func (c *CPU) set(bit byte, reg byte) byte {
+	return reg | (0x1 << bit)
+}
+
+func (c *CPU) res(bit byte, reg byte) byte {
+	return reg & ^(0x1 << bit)
 }
 
 func boolToByte(b bool) byte {

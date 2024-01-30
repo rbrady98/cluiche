@@ -60,6 +60,10 @@ func NewMemory() *Memory {
 }
 
 func (m *Memory) Read(addr uint16) byte {
+	// just for debugging
+	if addr == 0xFF44 {
+		return 0x90
+	}
 	return m.mem[addr]
 }
 
@@ -78,8 +82,6 @@ func (m *Memory) LoadROM(path string) error {
 
 	copy(m.mem[:CartridgeROM], data)
 
-	fmt.Println("memory len", len(m.mem))
-	fmt.Println("memory", m.mem[0x100:0x200])
 	return nil
 }
 

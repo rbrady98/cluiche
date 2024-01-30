@@ -31,7 +31,7 @@ func NewRegisters() *Registers {
 		e: 0xd8,
 		h: 0x01,
 		l: 0x4d,
-		f: flagsFromByte(0x01),
+		f: flagsFromByte(0xB0),
 	}
 }
 
@@ -97,10 +97,10 @@ func (f *FlagRegisters) toByte() byte {
 }
 
 func flagsFromByte(value byte) *FlagRegisters {
-	carry := (value>>CarryFlagBitPosition)&0b1 == 1
-	halfCarry := (value>>HalfCarryFlagBitPosition)&0b1 == 1
-	subtract := (value>>SubtractFlagBitPosition)&0b1 == 1
-	zero := (value>>ZeroFlagBitPosition)&0b1 == 1
+	carry := (value>>CarryFlagBitPosition)&0x1 == 1
+	halfCarry := (value>>HalfCarryFlagBitPosition)&0x1 == 1
+	subtract := (value>>SubtractFlagBitPosition)&0x1 == 1
+	zero := (value>>ZeroFlagBitPosition)&0x1 == 1
 
 	return &FlagRegisters{
 		carry,

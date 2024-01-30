@@ -523,10 +523,14 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.memory.Write(c.registers.getHL(), c.registers.l)
 		case 0x36: // LD HL,n
 			c.memory.Write(c.registers.getHL(), c.readNext())
+		case 0x0F:
+			c.rrca()
 		case 0x1F:
-			c.registers.a = c.rra()
+			c.rra()
 		case 0x08:
-			c.sp = c.readNext16()
+			addr := c.readNext16()
+			c.memory.Write(addr, byte(c.sp&0xF))
+			c.memory.Write(addr+1, byte(c.sp&0xF0))
 		case 0xBF: // CP A
 			c.cp(c.registers.a, c.registers.a)
 		case 0xB8: // CP B
@@ -564,19 +568,43 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.a = c.sub(c.registers.a, c.memory.Read(c.registers.getHL()))
 		case 0xD6: // SUB n
 			c.registers.a = c.sub(c.registers.a, c.readNext())
+		case 0x9F: // SBC A,A
+			c.registers.a = c.subC(c.registers.a, c.registers.a)
+		case 0x98: // SBC A,B
+			c.registers.a = c.subC(c.registers.a, c.registers.b)
+		case 0x99: // SBC A,C
+			c.registers.a = c.subC(c.registers.a, c.registers.c)
+		case 0x9A: // SBC A,D
+			c.registers.a = c.subC(c.registers.a, c.registers.d)
+		case 0x9B: // SBC A,E
+			c.registers.a = c.subC(c.registers.a, c.registers.e)
+		case 0x9C: // SBC A,H
+			c.registers.a = c.subC(c.registers.a, c.registers.h)
+		case 0x9D: // SBC A,L
+			c.registers.a = c.subC(c.registers.a, c.registers.l)
+		case 0x9E: // SBC A,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.registers.a = c.subC(c.registers.a, v)
+		case 0xDE: // SBC A,#
+			c.registers.a = c.subC(c.registers.a, c.readNext())
 		case 0x27: // DAA
 			c.daa()
 		case 0x37: // SCF
 			c.registers.f.Carry = true
+			c.registers.f.Subtract = false
+			c.registers.f.HalfCarry = false
+			c.registers.f.Carry = true
 		case 0x07:
 			c.rlca()
+		case 0x17:
+			c.rla()
+		case 0x3F:
+			c.ccf()
 		default:
 			panic(fmt.Sprintf("unimplemented opcode: %#2x\n", op))
 		}
 	} else {
 		switch op {
-		case 0x00:
-			fmt.Println("no op")
 		case 0x3F: // SRL A
 			c.registers.a = c.srl(c.registers.a)
 		case 0x38: // SRL B
@@ -627,6 +655,491 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.l = c.swap(c.registers.l)
 		case 0x36: // SWAO (HL)
 			c.memory.Write(c.registers.getHL(), c.swap(c.memory.Read(c.registers.getHL())))
+		case 0x07: // RLC A
+			c.registers.a = c.rlc(c.registers.a)
+		case 0x00: // RLC B
+			c.registers.b = c.rlc(c.registers.b)
+		case 0x01: // RLC C
+			c.registers.c = c.rlc(c.registers.c)
+		case 0x02: // RLC D
+			c.registers.d = c.rlc(c.registers.d)
+		case 0x03: // RLC E
+			c.registers.e = c.rlc(c.registers.e)
+		case 0x04: // RLC H
+			c.registers.h = c.rlc(c.registers.h)
+		case 0x05: // RLC L
+			c.registers.l = c.rlc(c.registers.l)
+		case 0x06: // RLC (HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.rlc(v))
+		case 0x0F: // RRC A
+			c.registers.a = c.rrc(c.registers.a)
+		case 0x08: // RRC B
+			c.registers.b = c.rrc(c.registers.b)
+		case 0x09: // RRC C
+			c.registers.c = c.rrc(c.registers.c)
+		case 0x0A: // RRC D
+			c.registers.d = c.rrc(c.registers.d)
+		case 0x0B: // RRC E
+			c.registers.e = c.rrc(c.registers.e)
+		case 0x0C: // RRC H
+			c.registers.h = c.rrc(c.registers.h)
+		case 0x0D: // RRC L
+			c.registers.l = c.rrc(c.registers.l)
+		case 0x0E: // RRC (HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.rrc(v))
+		case 0x17: // RL A
+			c.registers.a = c.rl(c.registers.a)
+		case 0x10: // RL B
+			c.registers.b = c.rl(c.registers.b)
+		case 0x11: // RL C
+			c.registers.c = c.rl(c.registers.c)
+		case 0x12: // RL D
+			c.registers.d = c.rl(c.registers.d)
+		case 0x13: // RL E
+			c.registers.e = c.rl(c.registers.e)
+		case 0x14: // RL H
+			c.registers.h = c.rl(c.registers.h)
+		case 0x15: // RL L
+			c.registers.l = c.rl(c.registers.l)
+		case 0x16: // RL (HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.rl(v))
+		case 0x27: // SLA A
+			c.registers.a = c.sla(c.registers.a)
+		case 0x20: // SLA B
+			c.registers.b = c.sla(c.registers.b)
+		case 0x21: // SLA C
+			c.registers.c = c.sla(c.registers.c)
+		case 0x22: // SLA D
+			c.registers.d = c.sla(c.registers.d)
+		case 0x23: // SLA E
+			c.registers.e = c.sla(c.registers.e)
+		case 0x24: // SLA H
+			c.registers.h = c.sla(c.registers.h)
+		case 0x25: // SLA L
+			c.registers.l = c.sla(c.registers.l)
+		case 0x26: // SLA (HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.sla(v))
+		case 0x2F: // SRA A
+			c.registers.a = c.sra(c.registers.a)
+		case 0x28: // SRA B
+			c.registers.b = c.sra(c.registers.b)
+		case 0x29: // SRA C
+			c.registers.c = c.sra(c.registers.c)
+		case 0x2A: // SRA D
+			c.registers.d = c.sra(c.registers.d)
+		case 0x2B: // SRA E
+			c.registers.e = c.sra(c.registers.e)
+		case 0x2C: // SRA H
+			c.registers.h = c.sra(c.registers.h)
+		case 0x2D: // SRA L
+			c.registers.l = c.sra(c.registers.l)
+		case 0x2E: // SRA (HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.sra(v))
+		case 0x47: // BIT 0,A
+			c.bit(0, c.registers.a)
+		case 0x40: // BIT 0,B
+			c.bit(0, c.registers.b)
+		case 0x41: // BIT 0,C
+			c.bit(0, c.registers.c)
+		case 0x42: // BIT 0,D
+			c.bit(0, c.registers.d)
+		case 0x43: // BIT 0,E
+			c.bit(0, c.registers.e)
+		case 0x44: // BIT 0,H
+			c.bit(0, c.registers.h)
+		case 0x45: // BIT 0,L
+			c.bit(0, c.registers.l)
+		case 0x46: // BIT 0,(HL)
+			c.bit(0, c.memory.Read(c.registers.getHL()))
+		case 0x4F: // BIT 1,A
+			c.bit(1, c.registers.a)
+		case 0x48: // BIT 1,B
+			c.bit(1, c.registers.b)
+		case 0x49: // BIT 1,C
+			c.bit(1, c.registers.c)
+		case 0x4A: // BIT 1,D
+			c.bit(1, c.registers.d)
+		case 0x4B: // BIT 1,E
+			c.bit(1, c.registers.e)
+		case 0x4C: // BIT 1,H
+			c.bit(1, c.registers.h)
+		case 0x4D: // BIT 1,L
+			c.bit(1, c.registers.l)
+		case 0x4E: // BIT 1,(HL)
+			c.bit(1, c.memory.Read(c.registers.getHL()))
+		case 0x57: // BIT 2,A
+			c.bit(2, c.registers.a)
+		case 0x50: // BIT 2,B
+			c.bit(2, c.registers.b)
+		case 0x51: // BIT 2,C
+			c.bit(2, c.registers.c)
+		case 0x52: // BIT 2,D
+			c.bit(2, c.registers.d)
+		case 0x53: // BIT 2,E
+			c.bit(2, c.registers.e)
+		case 0x54: // BIT 2,H
+			c.bit(2, c.registers.h)
+		case 0x55: // BIT 2,L
+			c.bit(2, c.registers.l)
+		case 0x56: // BIT 2,(HL)
+			c.bit(2, c.memory.Read(c.registers.getHL()))
+		case 0x5F: // BIT 3,A
+			c.bit(3, c.registers.a)
+		case 0x58: // BIT 3,B
+			c.bit(3, c.registers.b)
+		case 0x59: // BIT 3,C
+			c.bit(3, c.registers.c)
+		case 0x5A: // BIT 3,D
+			c.bit(3, c.registers.d)
+		case 0x5B: // BIT 3,E
+			c.bit(3, c.registers.e)
+		case 0x5C: // BIT 3,H
+			c.bit(3, c.registers.h)
+		case 0x5D: // BIT 3,L
+			c.bit(3, c.registers.l)
+		case 0x5E: // BIT 3,(HL)
+			c.bit(3, c.memory.Read(c.registers.getHL()))
+		case 0x67: // BIT 4,A
+			c.bit(4, c.registers.a)
+		case 0x60: // BIT 4,B
+			c.bit(4, c.registers.b)
+		case 0x61: // BIT 4,C
+			c.bit(4, c.registers.c)
+		case 0x62: // BIT 4,D
+			c.bit(4, c.registers.d)
+		case 0x63: // BIT 4,E
+			c.bit(4, c.registers.e)
+		case 0x64: // BIT 4,H
+			c.bit(4, c.registers.h)
+		case 0x65: // BIT 4,L
+			c.bit(4, c.registers.l)
+		case 0x66: // BIT 4,(HL)
+			c.bit(4, c.memory.Read(c.registers.getHL()))
+		case 0x6F: // BIT 5,A
+			c.bit(5, c.registers.a)
+		case 0x68: // BIT 5,B
+			c.bit(5, c.registers.b)
+		case 0x69: // BIT 5,C
+			c.bit(5, c.registers.c)
+		case 0x6A: // BIT 5,D
+			c.bit(5, c.registers.d)
+		case 0x6B: // BIT 5,E
+			c.bit(5, c.registers.e)
+		case 0x6C: // BIT 5,H
+			c.bit(5, c.registers.h)
+		case 0x6D: // BIT 5,L
+			c.bit(5, c.registers.l)
+		case 0x6E: // BIT 5,(HL)
+			c.bit(5, c.memory.Read(c.registers.getHL()))
+		case 0x77: // BIT 6,A
+			c.bit(6, c.registers.a)
+		case 0x70: // BIT 6,B
+			c.bit(6, c.registers.b)
+		case 0x71: // BIT 6,C
+			c.bit(6, c.registers.c)
+		case 0x72: // BIT 6,D
+			c.bit(6, c.registers.d)
+		case 0x73: // BIT 6,E
+			c.bit(6, c.registers.e)
+		case 0x74: // BIT 6,H
+			c.bit(6, c.registers.h)
+		case 0x75: // BIT 6,L
+			c.bit(6, c.registers.l)
+		case 0x76: // BIT 6,(HL)
+			c.bit(6, c.memory.Read(c.registers.getHL()))
+		case 0x7F: // BIT 7,A
+			c.bit(7, c.registers.a)
+		case 0x78: // BIT 7,B
+			c.bit(7, c.registers.b)
+		case 0x79: // BIT 7,C
+			c.bit(7, c.registers.c)
+		case 0x7A: // BIT 7,D
+			c.bit(7, c.registers.d)
+		case 0x7B: // BIT 7,E
+			c.bit(7, c.registers.e)
+		case 0x7C: // BIT 7,H
+			c.bit(7, c.registers.h)
+		case 0x7D: // BIT 7,L
+			c.bit(7, c.registers.l)
+		case 0x7E: // BIT 7,(HL)
+			c.bit(7, c.memory.Read(c.registers.getHL()))
+		case 0x87: // res 0,A
+			c.registers.a = c.res(0, c.registers.a)
+		case 0x80: // res 0,B
+			c.registers.b = c.res(0, c.registers.b)
+		case 0x81: // res 0,C
+			c.registers.c = c.res(0, c.registers.c)
+		case 0x82: // res 0,D
+			c.registers.d = c.res(0, c.registers.d)
+		case 0x83: // res 0,E
+			c.registers.e = c.res(0, c.registers.e)
+		case 0x84: // res 0,H
+			c.registers.h = c.res(0, c.registers.h)
+		case 0x85: // res 0,L
+			c.registers.l = c.res(0, c.registers.l)
+		case 0x86: // res 0,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(0, v))
+		case 0x8F: // res 1,A
+			c.registers.a = c.res(1, c.registers.a)
+		case 0x88: // res 1,B
+			c.registers.b = c.res(1, c.registers.b)
+		case 0x89: // res 1,C
+			c.registers.c = c.res(1, c.registers.c)
+		case 0x8A: // res 1,D
+			c.registers.d = c.res(1, c.registers.d)
+		case 0x8B: // res 1,E
+			c.registers.e = c.res(1, c.registers.e)
+		case 0x8C: // res 1,H
+			c.registers.h = c.res(1, c.registers.h)
+		case 0x8D: // res 1,L
+			c.registers.l = c.res(1, c.registers.l)
+		case 0x8E: // res 1,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(1, v))
+		case 0x97: // res 2,A
+			c.registers.a = c.res(2, c.registers.a)
+		case 0x90: // res 2,B
+			c.registers.b = c.res(2, c.registers.b)
+		case 0x91: // res 2,C
+			c.registers.c = c.res(2, c.registers.c)
+		case 0x92: // res 2,D
+			c.registers.d = c.res(2, c.registers.d)
+		case 0x93: // res 2,E
+			c.registers.e = c.res(2, c.registers.e)
+		case 0x94: // res 2,H
+			c.registers.h = c.res(2, c.registers.h)
+		case 0x95: // res 2,L
+			c.registers.l = c.res(2, c.registers.l)
+		case 0x96: // res 2,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(2, v))
+		case 0x9F: // res 3,A
+			c.registers.a = c.res(3, c.registers.a)
+		case 0x98: // res 3,B
+			c.registers.b = c.res(3, c.registers.b)
+		case 0x99: // res 3,C
+			c.registers.c = c.res(3, c.registers.c)
+		case 0x9A: // res 3,D
+			c.registers.d = c.res(3, c.registers.d)
+		case 0x9B: // res 3,E
+			c.registers.e = c.res(3, c.registers.e)
+		case 0x9C: // res 3,H
+			c.registers.h = c.res(3, c.registers.h)
+		case 0x9D: // res 3,L
+			c.registers.l = c.res(3, c.registers.l)
+		case 0x9E: // res 3,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(3, v))
+		case 0xA7: // res 4,A
+			c.registers.a = c.res(4, c.registers.a)
+		case 0xA0: // res 4,B
+			c.registers.b = c.res(4, c.registers.b)
+		case 0xA1: // res 4,C
+			c.registers.c = c.res(4, c.registers.c)
+		case 0xA2: // res 4,D
+			c.registers.d = c.res(4, c.registers.d)
+		case 0xA3: // res 4,E
+			c.registers.e = c.res(4, c.registers.e)
+		case 0xA4: // res 4,H
+			c.registers.h = c.res(4, c.registers.h)
+		case 0xA5: // res 4,L
+			c.registers.l = c.res(4, c.registers.l)
+		case 0xA6: // res 4,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(4, v))
+		case 0xAF: // res 5,A
+			c.registers.a = c.res(5, c.registers.a)
+		case 0xA8: // res 5,B
+			c.registers.b = c.res(5, c.registers.b)
+		case 0xA9: // res 5,C
+			c.registers.c = c.res(5, c.registers.c)
+		case 0xAA: // res 5,D
+			c.registers.d = c.res(5, c.registers.d)
+		case 0xAB: // res 5,E
+			c.registers.e = c.res(5, c.registers.e)
+		case 0xAC: // res 5,H
+			c.registers.h = c.res(5, c.registers.h)
+		case 0xAD: // res 5,L
+			c.registers.l = c.res(5, c.registers.l)
+		case 0xAE: // res 5,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(5, v))
+		case 0xB7: // res 6,A
+			c.registers.a = c.res(6, c.registers.a)
+		case 0xB0: // res 6,B
+			c.registers.b = c.res(6, c.registers.b)
+		case 0xB1: // res 6,C
+			c.registers.c = c.res(6, c.registers.c)
+		case 0xB2: // res 6,D
+			c.registers.d = c.res(6, c.registers.d)
+		case 0xB3: // res 6,E
+			c.registers.e = c.res(6, c.registers.e)
+		case 0xB4: // res 6,H
+			c.registers.h = c.res(6, c.registers.h)
+		case 0xB5: // res 6,L
+			c.registers.l = c.res(6, c.registers.l)
+		case 0xB6: // res 6,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(6, v))
+		case 0xBF: // res 7,A
+			c.registers.a = c.res(7, c.registers.a)
+		case 0xB8: // res 7,B
+			c.registers.b = c.res(7, c.registers.b)
+		case 0xB9: // res 7,C
+			c.registers.c = c.res(7, c.registers.c)
+		case 0xBA: // res 7,D
+			c.registers.d = c.res(7, c.registers.d)
+		case 0xBB: // res 7,E
+			c.registers.e = c.res(7, c.registers.e)
+		case 0xBC: // res 7,H
+			c.registers.h = c.res(7, c.registers.h)
+		case 0xBD: // res 7,L
+			c.registers.l = c.res(7, c.registers.l)
+		case 0xBE: // res 7,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.res(7, v))
+		case 0xC7: // set 0,A
+			c.registers.a = c.set(0, c.registers.a)
+		case 0xC0: // set 0,B
+			c.registers.b = c.set(0, c.registers.b)
+		case 0xC1: // set 0,C
+			c.registers.c = c.set(0, c.registers.c)
+		case 0xC2: // set 0,D
+			c.registers.d = c.set(0, c.registers.d)
+		case 0xC3: // set 0,E
+			c.registers.e = c.set(0, c.registers.e)
+		case 0xC4: // set 0,H
+			c.registers.h = c.set(0, c.registers.h)
+		case 0xC5: // set 0,L
+			c.registers.l = c.set(0, c.registers.l)
+		case 0xC6: // set 0,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(0, v))
+		case 0xCF: // set 1,A
+			c.registers.a = c.set(1, c.registers.a)
+		case 0xC8: // set 1,B
+			c.registers.b = c.set(1, c.registers.b)
+		case 0xC9: // set 1,C
+			c.registers.c = c.set(1, c.registers.c)
+		case 0xCA: // set 1,D
+			c.registers.d = c.set(1, c.registers.d)
+		case 0xCB: // set 1,E
+			c.registers.e = c.set(1, c.registers.e)
+		case 0xCC: // set 1,H
+			c.registers.h = c.set(1, c.registers.h)
+		case 0xCD: // set 1,L
+			c.registers.l = c.set(1, c.registers.l)
+		case 0xCE: // set 1,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(1, v))
+		case 0xD7: // set 2,A
+			c.registers.a = c.set(2, c.registers.a)
+		case 0xD0: // set 2,B
+			c.registers.b = c.set(2, c.registers.b)
+		case 0xD1: // set 2,C
+			c.registers.c = c.set(2, c.registers.c)
+		case 0xD2: // set 2,D
+			c.registers.d = c.set(2, c.registers.d)
+		case 0xD3: // set 2,E
+			c.registers.e = c.set(2, c.registers.e)
+		case 0xD4: // set 2,H
+			c.registers.h = c.set(2, c.registers.h)
+		case 0xD5: // set 2,L
+			c.registers.l = c.set(2, c.registers.l)
+		case 0xD6: // set 2,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(2, v))
+		case 0xDF: // set 3,A
+			c.registers.a = c.set(3, c.registers.a)
+		case 0xD8: // set 3,B
+			c.registers.b = c.set(3, c.registers.b)
+		case 0xD9: // set 3,C
+			c.registers.c = c.set(3, c.registers.c)
+		case 0xDA: // set 3,D
+			c.registers.d = c.set(3, c.registers.d)
+		case 0xDB: // set 3,E
+			c.registers.e = c.set(3, c.registers.e)
+		case 0xDC: // set 3,H
+			c.registers.h = c.set(3, c.registers.h)
+		case 0xDD: // set 3,L
+			c.registers.l = c.set(3, c.registers.l)
+		case 0xDE: // set 3,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(3, v))
+		case 0xE7: // set 4,A
+			c.registers.a = c.set(4, c.registers.a)
+		case 0xE0: // set 4,B
+			c.registers.b = c.set(4, c.registers.b)
+		case 0xE1: // set 4,C
+			c.registers.c = c.set(4, c.registers.c)
+		case 0xE2: // set 4,D
+			c.registers.d = c.set(4, c.registers.d)
+		case 0xE3: // set 4,E
+			c.registers.e = c.set(4, c.registers.e)
+		case 0xE4: // set 4,H
+			c.registers.h = c.set(4, c.registers.h)
+		case 0xE5: // set 4,L
+			c.registers.l = c.set(4, c.registers.l)
+		case 0xE6: // set 4,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(4, v))
+		case 0xEF: // set 5,A
+			c.registers.a = c.set(5, c.registers.a)
+		case 0xE8: // set 5,B
+			c.registers.b = c.set(5, c.registers.b)
+		case 0xE9: // set 5,C
+			c.registers.c = c.set(5, c.registers.c)
+		case 0xEA: // set 5,D
+			c.registers.d = c.set(5, c.registers.d)
+		case 0xEB: // set 5,E
+			c.registers.e = c.set(5, c.registers.e)
+		case 0xEC: // set 5,H
+			c.registers.h = c.set(5, c.registers.h)
+		case 0xED: // set 5,L
+			c.registers.l = c.set(5, c.registers.l)
+		case 0xEE: // set 5,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(5, v))
+		case 0xF7: // set 6,A
+			c.registers.a = c.set(6, c.registers.a)
+		case 0xF0: // set 6,B
+			c.registers.b = c.set(6, c.registers.b)
+		case 0xF1: // set 6,C
+			c.registers.c = c.set(6, c.registers.c)
+		case 0xF2: // set 6,D
+			c.registers.d = c.set(6, c.registers.d)
+		case 0xF3: // set 6,E
+			c.registers.e = c.set(6, c.registers.e)
+		case 0xF4: // set 6,H
+			c.registers.h = c.set(6, c.registers.h)
+		case 0xF5: // set 6,L
+			c.registers.l = c.set(6, c.registers.l)
+		case 0xF6: // set 6,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(6, v))
+		case 0xFF: // set 7,A
+			c.registers.a = c.set(7, c.registers.a)
+		case 0xF8: // set 7,B
+			c.registers.b = c.set(7, c.registers.b)
+		case 0xF9: // set 7,C
+			c.registers.c = c.set(7, c.registers.c)
+		case 0xFA: // set 7,D
+			c.registers.d = c.set(7, c.registers.d)
+		case 0xFB: // set 7,E
+			c.registers.e = c.set(7, c.registers.e)
+		case 0xFC: // set 7,H
+			c.registers.h = c.set(7, c.registers.h)
+		case 0xFD: // set 7,L
+			c.registers.l = c.set(7, c.registers.l)
+		case 0xFE: // set 7,(HL)
+			v := c.memory.Read(c.registers.getHL())
+			c.memory.Write(c.registers.getHL(), c.set(7, v))
 		default:
 			panic(fmt.Sprintf("unimplemented opcode: CB %#2x\n", op))
 		}

@@ -29,7 +29,6 @@ func NewGame(w, h int, romPath string) *Game {
 
 func (g *Game) Update() error {
 	g.gb.Update()
-	// bufio.NewReader(os.Stdin).ReadBytes('\n')
 	return nil
 }
 
