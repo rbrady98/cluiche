@@ -4,7 +4,10 @@ import (
 	"log"
 )
 
-const CyclesPerFrame = 70224
+const (
+	ClockSpeed     = 4213440
+	CyclesPerFrame = 70224
+)
 
 type Gameboy struct {
 	cpu    *CPU
@@ -15,14 +18,13 @@ type Gameboy struct {
 func NewGameboy(romPath string) (*Gameboy, error) {
 	mem := NewMemory()
 	cpu := NewCPU(mem)
-	ppu := NewPPU(mem)
+	ppu := NewPPU(cpu, mem)
 
 	gb := &Gameboy{
 		cpu,
 		ppu,
 		mem,
 	}
-
 
 	err := gb.memory.LoadROM(romPath)
 	if err != nil {
@@ -50,18 +52,9 @@ func (g *Gameboy) Update() {
 	for frameCycles < CyclesPerFrame {
 		g.debugLog()
 
-		g.cpu.Update()
-
-		// log for debugging
-		// g.ppu.Update(1)
-		// if frameCycles%1000 == 0 {
-		//     fmt.Println(g.cpu.registers)
-		// 	fmt.Println("Waiting for enter key to conitnue")
-		// 	bufio.NewReader(os.Stdin).ReadBytes('\n')
-		// }
-		// tick the timers
-
-		frameCycles += 1
+		c := g.cpu.Update()
+		g.ppu.Update(c)
+		frameCycles += c
 	}
 }
 

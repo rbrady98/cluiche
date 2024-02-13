@@ -16,7 +16,7 @@ type Game struct {
 func NewGame(w, h int, romPath string) *Game {
 	gb, err := NewGameboy(romPath)
 	if err != nil {
-		return nil
+		panic(err)
 	}
 
 	return &Game{

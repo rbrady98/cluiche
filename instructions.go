@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // Perform ADD instruction
 func (c *CPU) add(reg1 byte, reg2 byte) byte {
 	total := int16(reg1) + int16(reg2)
@@ -170,6 +172,7 @@ func (c *CPU) ret() {
 }
 
 func (c *CPU) halt() {
+	fmt.Println("program has been halted")
 	c.halted = true
 }
 

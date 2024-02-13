@@ -2,6 +2,53 @@ package main
 
 import "fmt"
 
+const (
+	InterruptEnabledReg = 0xFFFF
+	InterruptFlagReg    = 0xFF0F
+	DIV                 = 0xFF04
+	TIMA                = 0xFF05
+	TMA                 = 0xFF06
+	TAC                 = 0xFF07
+)
+
+var OpcodeCycles = []int{
+	1, 3, 2, 2, 1, 1, 2, 1, 5, 2, 2, 2, 1, 1, 2, 1, // 0
+	0, 3, 2, 2, 1, 1, 2, 1, 3, 2, 2, 2, 1, 1, 2, 1, // 1
+	2, 3, 2, 2, 1, 1, 2, 1, 2, 2, 2, 2, 1, 1, 2, 1, // 2
+	2, 3, 2, 2, 3, 3, 3, 1, 2, 2, 2, 2, 1, 1, 2, 1, // 3
+	1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, // 4
+	1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, // 5
+	1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, // 6
+	2, 2, 2, 2, 2, 2, 0, 2, 1, 1, 1, 1, 1, 1, 2, 1, // 7
+	1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, // 8
+	1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, // 9
+	1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, // a
+	1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, // b
+	2, 3, 3, 4, 3, 4, 2, 4, 2, 4, 3, 0, 3, 6, 2, 4, // c
+	2, 3, 3, 0, 3, 4, 2, 4, 2, 4, 3, 0, 3, 0, 2, 4, // d
+	3, 3, 2, 0, 0, 4, 2, 4, 4, 1, 4, 0, 0, 0, 2, 4, // e
+	3, 3, 2, 1, 0, 4, 2, 4, 3, 2, 4, 1, 0, 0, 2, 4, // f
+} // 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+
+var CBOpcodeCycles = []int{
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // 0
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // 1
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // 2
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // 3
+	2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 3, 2, // 4
+	2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 3, 2, // 5
+	2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 3, 2, // 6
+	2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 3, 2, // 7
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // 8
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // 9
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // A
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // B
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // C
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // D
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // E
+	2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 4, 2, // F
+} // 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+
 type CPU struct {
 	registers *Registers
 	memory    *Memory
@@ -11,34 +58,44 @@ type CPU struct {
 
 	halted            bool
 	interruptsEnabled bool
+
+	dividerCounter int
+	timerCounter   int
 }
 
 func NewCPU(mem *Memory) *CPU {
 	return &CPU{
-		registers: NewRegisters(),
-		memory:    mem,
-		pc:        0x0100,
-		sp:        0xFFFE,
+		registers:    NewRegisters(),
+		memory:       mem,
+		pc:           0x0100,
+		sp:           0xFFFE,
+		timerCounter: 1024,
 	}
 }
 
 // Update ticks the cpu, reading the next instruction and executing it
-func (c *CPU) Update() {
-	// fmt.Printf("pc: %x\n", c.pc)
-	opcode := c.readNext()
-	prefixed := opcode == 0xCB
-	if prefixed {
-		opcode = c.readNext()
+func (c *CPU) Update() int {
+	var cycles int
+
+	if !c.halted {
+		opcode := c.readNext()
+		cycles = OpcodeCycles[opcode] * 4
+		prefixed := opcode == 0xCB
+		if prefixed {
+			opcode = c.readNext()
+			cycles = CBOpcodeCycles[opcode] * 4
+		}
+
+		c.execute(opcode, prefixed)
+	} else {
+		cycles = 4
 	}
 
-	// if prefixed {
-	// 	fmt.Printf("opcode: 0xCB 0x%x\n", opcode)
-	// } else {
-	// 	fmt.Printf("opcode: 0x%x\n", opcode)
-	// }
+	cycles += c.handleInterrupt()
 
-	nextAddr := c.execute(opcode, prefixed)
-	c.pc = nextAddr
+	c.updateTimers(cycles)
+
+	return cycles
 }
 
 // execute matches an opcode to an instruction
@@ -181,6 +238,9 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			v := c.memory.Read(c.registers.getHL())
 			c.memory.Write(c.registers.getHL(), c.inc(v))
 		case 0xC9: // RET
+			c.ret()
+		case 0xD9: // RET
+			c.interruptsEnabled = true
 			c.ret()
 		case 0xC0: // RET NZ
 			if !c.registers.f.Zero {
@@ -600,6 +660,8 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.rla()
 		case 0x3F:
 			c.ccf()
+		case 0x76:
+			c.halt()
 		default:
 			panic(fmt.Sprintf("unimplemented opcode: %#2x\n", op))
 		}
@@ -1146,6 +1208,94 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 	}
 
 	return c.pc
+}
+
+func (c *CPU) requestInterrupt(val byte) {
+	if !c.interruptsEnabled && c.halted {
+		c.halted = false
+		return
+	}
+	c.memory.Write(InterruptFlagReg, c.set(val, c.memory.Read(InterruptFlagReg)))
+}
+
+func (c *CPU) handleInterrupt() int {
+	if !c.interruptsEnabled {
+		return 0
+	}
+
+	// read the if bit that is set, reset the bit, disable interrupts
+	req := c.memory.Read(InterruptFlagReg)
+	enabled := c.memory.Read(InterruptEnabledReg)
+
+	// loop over interrupts in order of priority
+	for i := 0; i < 5; i++ {
+		if TestBit(req, i) && TestBit(enabled, i) {
+			// fmt.Println("Interrupt", i, "has been enabled")
+			c.interruptsEnabled = false
+			c.memory.Write(InterruptFlagReg, ResetBit(req, byte(i)))
+			c.push(c.pc)
+
+			switch i {
+			case 0:
+				c.pc = 0x40
+			case 1:
+				c.pc = 0x48
+			case 2:
+				c.pc = 0x50
+			case 3:
+				c.pc = 0x58
+			case 4:
+				c.pc = 0x60
+			}
+
+			return 20
+		}
+	}
+
+	return 0
+}
+
+// TODO: this is not correct
+func (c *CPU) updateTimers(cycles int) {
+	c.dividerCounter += cycles
+	if c.dividerCounter >= 255 {
+		c.memory.mem[DIV]++
+		c.dividerCounter = 0
+	}
+
+	// is timer enabled
+	if TestBit(c.memory.Read(TAC), 2) {
+		c.timerCounter -= cycles
+
+		// time to update the timer
+		if c.timerCounter <= 0 {
+			c.SetClockFreq()
+
+			if c.memory.Read(TIMA) == 0xFF {
+				c.memory.Write(TIMA, c.memory.Read(TMA))
+				c.requestInterrupt(2)
+			} else {
+				c.memory.Write(TIMA, c.memory.Read(TIMA)+1)
+			}
+		}
+	}
+}
+
+func (c *CPU) GetClockFreq() byte {
+	return c.memory.Read(TAC) & 0x3
+}
+
+func (c *CPU) SetClockFreq() {
+	switch c.GetClockFreq() {
+	case 0:
+		c.timerCounter = 1024
+	case 1:
+		c.timerCounter = 16
+	case 2:
+		c.timerCounter = 64
+	case 3:
+		c.timerCounter = 256
+	}
 }
 
 // readNext reads the opcode at the program counter and increments the program counter

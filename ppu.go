@@ -22,15 +22,18 @@ const (
 )
 
 type PPU struct {
-	mem  *Memory
+	mem *Memory
+	cpu *CPU
+
 	dots int
 
 	frame [ScreenHeight][ScreenWidth][3]byte
 }
 
-func NewPPU(mem *Memory) *PPU {
+func NewPPU(cpu *CPU, mem *Memory) *PPU {
 	return &PPU{
 		mem: mem,
+		cpu: cpu,
 	}
 }
 
@@ -41,10 +44,12 @@ func (p *PPU) Update(cycles int) {
 	line := p.getLine()
 
 	p.dots += cycles
-	// fmt.Printf("status %08b\n", status)
-	// fmt.Println("current line:", line)
-	// fmt.Println("mode:", int(mode))
-	// fmt.Println("dots", int(p.dots))
+
+	if line == 144 {
+		p.setMode(status, Mode1)
+		mode = Mode1
+		p.cpu.requestInterrupt(0)
+	}
 
 	switch mode {
 	case Mode2:
@@ -79,14 +84,11 @@ func (p *PPU) Update(cycles int) {
 
 	case Mode1: // V Blank
 		if p.dots >= 456 {
-			// fmt.Println("V Blank complete")
 			p.dots = 0
 
-			// TODO: after the vblank is finished we have fully rendered a frame
-			// set the current line to 0, push the framebuffer to the screen
 			if line == 153 {
 				p.setLine(0)
-				// fmt.Println("Screen buffer:", p.frame)
+				p.setMode(status, Mode2)
 			} else {
 				p.setLine(line + 1)
 			}
@@ -98,11 +100,12 @@ func (p *PPU) Update(cycles int) {
 
 func (p *PPU) RenderBackground(control byte) {
 	// get the tile offset that we should be using
+
 	tileDataAddr := p.getTileDataAddress(control)
 	tileMapAddr := p.getTileMapAddress(control)
 
 	// set current x and y position considering scroll
-	yPos := p.getLine() + int(p.mem.Read(SCY))
+	yPos := (p.getLine() + int(p.mem.Read(SCY))) % 144
 	tileYOffset := uint16(yPos/8) * 32 // TODO: is this right, should it wrap
 
 	for pixel := byte(0); pixel < ScreenWidth; pixel++ {
@@ -129,7 +132,7 @@ func (p *PPU) RenderBackground(control byte) {
 		colour := (palette >> (colourID * 2) & 0x3)
 		r, g, b := toScreenColour(colour)
 
-		p.DrawPixel(int(pixel), p.getLine(), r, g, b)
+		p.DrawPixel(int(pixel), yPos, r, g, b)
 	}
 }
 func (p *PPU) RenderSprites() {}
@@ -181,7 +184,7 @@ func getMode(stat byte) byte {
 }
 
 func (p *PPU) setMode(stat byte, mode byte) {
-	s := stat | mode
+	s := (stat & 0xFC) | mode
 	p.mem.Write(STAT, s)
 }
 

@@ -61,14 +61,14 @@ func NewMemory() *Memory {
 
 func (m *Memory) Read(addr uint16) byte {
 	// just for debugging
-	if addr == 0xFF44 {
-		return 0x90
-	}
+	// if addr == 0xFF44 || addr == 0xff02 {
+	// 	return 0x90
+	// }
 	return m.mem[addr]
 }
 
 func (m *Memory) Write(addr uint16, val byte) {
-	if addr == 0xFF02 && val == 0x81 {
+	if addr == 0xFF01 {
 		fmt.Print(string(m.mem[0xFF01]))
 	}
 	m.mem[addr] = val
