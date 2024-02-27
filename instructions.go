@@ -128,12 +128,16 @@ func (c *CPU) add16(reg1 uint16, reg2 uint16) uint16 {
 	return uint16(total)
 }
 
-func (c *CPU) signedAdd16(reg1 uint16, reg2 uint16) uint16 {
-	total := int32(reg1) + int32(reg2)
+func (c *CPU) signedAdd16(reg1 uint16, reg2 int8) uint16 {
+	total := uint16(int32(reg1) + int32(reg2))
 
+	// NOTE: why does this work???
+	tmp := reg1 ^ uint16(reg2) ^ total
+
+	c.registers.f.Zero = false
 	c.registers.f.Subtract = false
-	c.registers.f.HalfCarry = int32(reg1&0xFFF) > (total & 0xFFF)
-	c.registers.f.Carry = total > 0xFFFF
+	c.registers.f.HalfCarry = (tmp & 0x10) == 0x10
+	c.registers.f.Carry = tmp&0x100 == 0x100
 
 	return uint16(total)
 }
@@ -172,7 +176,6 @@ func (c *CPU) ret() {
 }
 
 func (c *CPU) halt() {
-	fmt.Println("program has been halted")
 	c.halted = true
 }
 

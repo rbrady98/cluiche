@@ -48,6 +48,11 @@ func (p *PPU) Update(cycles int) {
 	if line == 144 {
 		p.setMode(status, Mode1)
 		mode = Mode1
+
+		if TestBit(status, 4) {
+			p.cpu.requestInterrupt(1)
+		}
+
 		p.cpu.requestInterrupt(0)
 	}
 
@@ -70,6 +75,10 @@ func (p *PPU) Update(cycles int) {
 			p.setMode(status, Mode0)
 			p.dots = 0
 
+			if TestBit(status, 3) {
+				p.cpu.requestInterrupt(1)
+			}
+
 			// draw the scanline as we finish the mode
 			p.RenderBackground(p.mem.Read(LCDC))
 		}
@@ -80,6 +89,10 @@ func (p *PPU) Update(cycles int) {
 			p.dots = 0
 			p.setLine(line + 1)
 			p.setMode(status, Mode2)
+
+			if TestBit(status, 5) {
+				p.cpu.requestInterrupt(1)
+			}
 		}
 
 	case Mode1: // V Blank
@@ -89,13 +102,15 @@ func (p *PPU) Update(cycles int) {
 			if line == 153 {
 				p.setLine(0)
 				p.setMode(status, Mode2)
+
+				if TestBit(status, 5) {
+					p.cpu.requestInterrupt(1)
+				}
 			} else {
 				p.setLine(line + 1)
 			}
 		}
 	}
-
-	// TODO: set the new status back into the status register
 }
 
 func (p *PPU) RenderBackground(control byte) {
@@ -105,25 +120,29 @@ func (p *PPU) RenderBackground(control byte) {
 	tileMapAddr := p.getTileMapAddress(control)
 
 	// set current x and y position considering scroll
-	yPos := (p.getLine() + int(p.mem.Read(SCY))) % 144
-	tileYOffset := uint16(yPos/8) * 32 // TODO: is this right, should it wrap
+	yPos := (p.getLine() + int(p.mem.Read(SCY))) % 256
+	tileYOffset := uint16(yPos/8) * 32
 
 	for pixel := byte(0); pixel < ScreenWidth; pixel++ {
-		xPos := pixel + p.mem.Read(SCX)
-		tileXOffset := uint16(xPos / 8)
+		xPos := uint16(pixel+p.mem.Read(SCX)) % 256
+		tileXOffset := xPos / 8
 
 		tileNumAddr := tileMapAddr + tileYOffset + tileXOffset
 		// TODO: handle unsigned addressing
 		tileNum := p.mem.Read(tileNumAddr)
-
-		tileDataAddr := tileDataAddr + (uint16(tileNum) * 16)
+		var tileAddr uint16
+		if tileDataAddr == 0x8800 {
+			tileAddr = uint16(int32(tileDataAddr) + int32(int8(tileNum))*16)
+		} else {
+			tileAddr = tileDataAddr + (uint16(tileNum) * 16)
+		}
 
 		// read correct two bytes based on current line
 		yOffset := (yPos % 8) * 2
 		xOffset := 8 - (xPos % 8)
 
-		d1 := p.mem.Read(tileDataAddr + uint16(yOffset))
-		d2 := p.mem.Read(tileDataAddr + uint16(yOffset))
+		d1 := p.mem.Read(tileAddr + uint16(yOffset))
+		d2 := p.mem.Read(tileAddr + uint16(yOffset) + 1)
 
 		colourID := ((d2>>xOffset)&1)<<1 | (d1>>xOffset)&1
 
@@ -132,7 +151,7 @@ func (p *PPU) RenderBackground(control byte) {
 		colour := (palette >> (colourID * 2) & 0x3)
 		r, g, b := toScreenColour(colour)
 
-		p.DrawPixel(int(pixel), yPos, r, g, b)
+		p.DrawPixel(int(pixel), p.getLine(), r, g, b)
 	}
 }
 func (p *PPU) RenderSprites() {}
@@ -155,10 +174,10 @@ func (p *PPU) getTileMapAddress(control byte) uint16 {
 }
 
 func (p *PPU) getTileDataAddress(control byte) uint16 {
-	var base uint16 = 0x8000
+	var base uint16 = 0x8800
 
 	if TestBit(control, 4) {
-		base = 0x8800
+		base = 0x8000
 	}
 
 	return base

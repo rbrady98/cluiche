@@ -76,7 +76,6 @@ func NewCPU(mem *Memory) *CPU {
 // Update ticks the cpu, reading the next instruction and executing it
 func (c *CPU) Update() int {
 	var cycles int
-
 	if !c.halted {
 		opcode := c.readNext()
 		cycles = OpcodeCycles[opcode] * 4
@@ -122,11 +121,8 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0xF9: // LD SP,HL
 			c.sp = c.registers.getHL()
 		case 0xF8: // LD HL, SP=n
-			addr := c.sp + uint16(int8(c.readNext()))
+			addr := c.signedAdd16(c.sp, int8(c.readNext()))
 			c.registers.setHL(addr)
-
-			c.registers.f.Zero = false
-			c.registers.f.Subtract = false
 		case 0x7F: // LD A,A
 			// self assign just skip
 		case 0x47: // LD B,A
@@ -383,6 +379,9 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.registers.setHL(c.add16(c.registers.getHL(), c.registers.getHL()))
 		case 0x39: // ADD HL,SP
 			c.registers.setHL(c.add16(c.registers.getHL(), c.sp))
+		case 0xE8: // ADD SP,n
+			n := c.signedAdd16(c.sp, int8(c.readNext()))
+			c.sp = n
 		case 0x3D: // DEC A
 			c.registers.a = c.dec(c.registers.a)
 		case 0x05: // DEC B
@@ -589,8 +588,8 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 			c.rra()
 		case 0x08:
 			addr := c.readNext16()
-			c.memory.Write(addr, byte(c.sp&0xF))
-			c.memory.Write(addr+1, byte(c.sp&0xF0))
+			c.memory.Write(addr, byte(c.sp&0xFF))
+			c.memory.Write(addr+1, byte(c.sp>>8))
 		case 0xBF: // CP A
 			c.cp(c.registers.a, c.registers.a)
 		case 0xB8: // CP B
