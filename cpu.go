@@ -90,9 +90,8 @@ func (c *CPU) Update() int {
 		cycles = 4
 	}
 
-	cycles += c.handleInterrupt()
-
 	c.updateTimers(cycles)
+	cycles += c.handleInterrupt()
 
 	return cycles
 }
@@ -212,9 +211,9 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 				addr := int16(c.pc) + int16(v)
 				c.jump(uint16(addr))
 			}
-		case 0xf3: // DI
+		case 0xF3: // DI
 			c.interruptsEnabled = false
-		case 0xfB: // DI
+		case 0xFB: // EI
 			c.interruptsEnabled = true
 		case 0x3C: // INC A
 			c.registers.a = c.inc(c.registers.a)
@@ -1212,8 +1211,8 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 func (c *CPU) requestInterrupt(val byte) {
 	if !c.interruptsEnabled && c.halted {
 		c.halted = false
-		return
 	}
+
 	c.memory.Write(InterruptFlagReg, c.set(val, c.memory.Read(InterruptFlagReg)))
 }
 
@@ -1257,9 +1256,9 @@ func (c *CPU) handleInterrupt() int {
 // TODO: this is not correct
 func (c *CPU) updateTimers(cycles int) {
 	c.dividerCounter += cycles
-	if c.dividerCounter >= 255 {
+	if c.dividerCounter >= 256 {
 		c.memory.mem[DIV]++
-		c.dividerCounter = 0
+		c.dividerCounter -= 256
 	}
 
 	// is timer enabled
@@ -1268,7 +1267,9 @@ func (c *CPU) updateTimers(cycles int) {
 
 		// time to update the timer
 		if c.timerCounter <= 0 {
+			t := c.timerCounter
 			c.SetClockFreq()
+			c.timerCounter += t
 
 			if c.memory.Read(TIMA) == 0xFF {
 				c.memory.Write(TIMA, c.memory.Read(TMA))

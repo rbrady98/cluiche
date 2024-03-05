@@ -20,13 +20,17 @@ const (
 
 type Memory struct {
 	mem [0xFFFF + 1]byte
+
+	cpu *CPU
 }
 
 func NewMemory() *Memory {
 	m := &Memory{}
+
 	m.mem[0xFF05] = 0x00
 	m.mem[0xFF06] = 0x00
-	m.mem[0xFF07] = 0x00
+	m.mem[0xFF07] = 0xF8
+	m.mem[0xFF0F] = 0xE1
 	m.mem[0xFF10] = 0x80
 	m.mem[0xFF11] = 0xBF
 	m.mem[0xFF12] = 0xF3
@@ -71,6 +75,28 @@ func (m *Memory) Write(addr uint16, val byte) {
 	if addr == 0xFF01 {
 		fmt.Print(string(m.mem[0xFF01]))
 	}
+
+	// reset the divider register when written to
+	if addr == DIV {
+		m.mem[addr] = 0
+		m.cpu.dividerCounter = 0
+		m.cpu.SetClockFreq()
+		return
+	}
+
+	// might reset if tac is written to
+	if addr == TAC {
+		curFreq := m.cpu.GetClockFreq()
+		m.mem[addr] = val
+		newFreq := m.cpu.GetClockFreq()
+
+		if newFreq != curFreq {
+			m.cpu.SetClockFreq()
+		}
+
+		return
+	}
+
 	m.mem[addr] = val
 }
 
