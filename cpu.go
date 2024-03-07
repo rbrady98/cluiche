@@ -1253,7 +1253,6 @@ func (c *CPU) handleInterrupt() int {
 	return 0
 }
 
-// TODO: this is not correct
 func (c *CPU) updateTimers(cycles int) {
 	c.dividerCounter += cycles
 	if c.dividerCounter >= 256 {

@@ -72,9 +72,9 @@ func (m *Memory) Read(addr uint16) byte {
 }
 
 func (m *Memory) Write(addr uint16, val byte) {
-	if addr == 0xFF01 {
-		fmt.Print(string(m.mem[0xFF01]))
-	}
+	// if addr == 0xFF01 {
+	// 	fmt.Print(string(m.mem[0xFF01]))
+	// }
 
 	// reset the divider register when written to
 	if addr == DIV {
@@ -84,7 +84,7 @@ func (m *Memory) Write(addr uint16, val byte) {
 		return
 	}
 
-	// might reset if tac is written to
+	// reset if tac is written to
 	if addr == TAC {
 		curFreq := m.cpu.GetClockFreq()
 		m.mem[addr] = val

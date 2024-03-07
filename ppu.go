@@ -128,10 +128,10 @@ func (p *PPU) RenderBackground(control byte) {
 		tileXOffset := xPos / 8
 
 		tileNumAddr := tileMapAddr + tileYOffset + tileXOffset
-		// TODO: handle unsigned addressing
+
 		tileNum := p.mem.Read(tileNumAddr)
 		var tileAddr uint16
-		if tileDataAddr == 0x8800 {
+		if tileDataAddr == 0x9000 {
 			tileAddr = uint16(int32(tileDataAddr) + int32(int8(tileNum))*16)
 		} else {
 			tileAddr = tileDataAddr + (uint16(tileNum) * 16)
@@ -139,7 +139,7 @@ func (p *PPU) RenderBackground(control byte) {
 
 		// read correct two bytes based on current line
 		yOffset := (yPos % 8) * 2
-		xOffset := 8 - (xPos % 8)
+		xOffset := 7 - (xPos % 8)
 
 		d1 := p.mem.Read(tileAddr + uint16(yOffset))
 		d2 := p.mem.Read(tileAddr + uint16(yOffset) + 1)
@@ -174,7 +174,7 @@ func (p *PPU) getTileMapAddress(control byte) uint16 {
 }
 
 func (p *PPU) getTileDataAddress(control byte) uint16 {
-	var base uint16 = 0x8800
+	var base uint16 = 0x9000
 
 	if TestBit(control, 4) {
 		base = 0x8000
