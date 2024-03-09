@@ -137,6 +137,8 @@ func (p *PPU) RenderBackground(control byte) {
 			tileAddr = tileDataAddr + (uint16(tileNum) * 16)
 		}
 
+		// fmt.Printf("lcd control: %02X tilenum: %02X tilenumaddr: %02X tiledataaddr: %02X\n", control, tileNum, tileNum, tileAddr)
+
 		// read correct two bytes based on current line
 		yOffset := (yPos % 8) * 2
 		xOffset := 7 - (xPos % 8)

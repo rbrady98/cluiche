@@ -564,6 +564,9 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0x22: // LD (HLI),A
 			c.memory.Write(c.registers.getHL(), c.registers.a)
 			c.registers.setHL(c.inc16(c.registers.getHL()))
+		case 0x3A: // LD A,(HLD)
+			c.registers.a = c.memory.Read(c.registers.getHL())
+			c.registers.setHL(c.dec16(c.registers.getHL()))
 		case 0x32: // LD (HLD),A
 			c.memory.Write(c.registers.getHL(), c.registers.a)
 			c.registers.setHL(c.dec16(c.registers.getHL()))

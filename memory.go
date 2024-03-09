@@ -7,26 +7,19 @@ import (
 
 const (
 	CartridgeROM = 0x8000
-	VRAM         = 0xA000 // 8kB video ram
-	ExternalRAM  = 0xC000 // ram from the cartridge
-	WRAM         = 0xE000
-	EchoRAM      = 0xE000 // echo of internal ram, can be ignored
-	OAM          = 0xFE00 // sprite object memory
-	Empty        = 0xFEA0 // empty memory but unusable for io
-	IOPorts      = 0xFF00 // memory mapped io lives here
-	Empty2       = 0xFE4C // empty memory but unusable for io
-	HRAM         = 0xFF80 // internal ram at the top of the map
 )
 
 type Memory struct {
 	mem [0xFFFF + 1]byte
 
-	cpu *CPU
+	cpu   *CPU
+	input *Input
 }
 
 func NewMemory() *Memory {
 	m := &Memory{}
 
+	m.mem[0xFF00] = 0xCF
 	m.mem[0xFF05] = 0x00
 	m.mem[0xFF06] = 0x00
 	m.mem[0xFF07] = 0xF8
@@ -68,6 +61,11 @@ func (m *Memory) Read(addr uint16) byte {
 	// if addr == 0xFF44 || addr == 0xff02 {
 	// 	return 0x90
 	// }
+
+	if addr == JOYP {
+		return m.input.GetInput(m.mem[JOYP])
+	}
+
 	return m.mem[addr]
 }
 
@@ -75,6 +73,10 @@ func (m *Memory) Write(addr uint16, val byte) {
 	// if addr == 0xFF01 {
 	// 	fmt.Print(string(m.mem[0xFF01]))
 	// }
+	if addr == JOYP {
+		m.mem[addr] = val & 0x30
+		return
+	}
 
 	// reset the divider register when written to
 	if addr == DIV {
