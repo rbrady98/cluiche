@@ -115,21 +115,36 @@ func (p *PPU) Update(cycles int) {
 
 func (p *PPU) RenderBackground(control byte) {
 	// get the tile offset that we should be using
+	scx := p.mem.Read(SCX)
+	scy := p.mem.Read(SCY)
+	wx := p.mem.Read(WX) - 7
+	wy := p.mem.Read(WY)
 
+	currentLine := p.getLine()
+	inWindow := p.inWindow(control, int(wy), currentLine)
 	tileDataAddr := p.getTileDataAddress(control)
-	tileMapAddr := p.getTileMapAddress(control)
+	tileMapAddr := p.getTileMapAddress(control, inWindow)
+	palette := p.mem.Read(0xFF47)
 
 	// set current x and y position considering scroll
-	yPos := (p.getLine() + int(p.mem.Read(SCY))) % 256
+	yPos := (currentLine + int(scy)) % 256
+	if inWindow {
+		yPos = currentLine - int(wy)
+	}
+
 	tileYOffset := uint16(yPos/8) * 32
 
 	for pixel := byte(0); pixel < ScreenWidth; pixel++ {
-		xPos := uint16(pixel+p.mem.Read(SCX)) % 256
+		xPos := uint16(pixel+scx) % 256
+		if inWindow && pixel >= wx {
+			xPos = uint16(pixel - wx)
+		}
+
 		tileXOffset := xPos / 8
 
 		tileNumAddr := tileMapAddr + tileYOffset + tileXOffset
-
 		tileNum := p.mem.Read(tileNumAddr)
+
 		var tileAddr uint16
 		if tileDataAddr == 0x9000 {
 			tileAddr = uint16(int32(tileDataAddr) + int32(int8(tileNum))*16)
@@ -148,14 +163,13 @@ func (p *PPU) RenderBackground(control byte) {
 
 		colourID := ((d2>>xOffset)&1)<<1 | (d1>>xOffset)&1
 
-		palette := p.mem.Read(0xFF47)
-
 		colour := (palette >> (colourID * 2) & 0x3)
 		r, g, b := toScreenColour(colour)
 
-		p.DrawPixel(int(pixel), p.getLine(), r, g, b)
+		p.DrawPixel(int(pixel), currentLine, r, g, b)
 	}
 }
+
 func (p *PPU) RenderSprites() {}
 
 func (p *PPU) DrawPixel(x, y int, r, g, b byte) {
@@ -164,11 +178,15 @@ func (p *PPU) DrawPixel(x, y int, r, g, b byte) {
 	p.frame[y][x][2] = b
 }
 
-func (p *PPU) getTileMapAddress(control byte) uint16 {
+func (p *PPU) getTileMapAddress(control byte, inWindow bool) uint16 {
 	var base uint16 = 0x9800
 
-	// TODO: handle window bit change
-	if TestBit(control, 3) {
+	bit := 3
+	if inWindow {
+		bit = 6
+	}
+
+	if TestBit(control, bit) {
 		base = 0x9C00
 	}
 
@@ -183,6 +201,10 @@ func (p *PPU) getTileDataAddress(control byte) uint16 {
 	}
 
 	return base
+}
+
+func (p *PPU) inWindow(control byte, wy int, line int) bool {
+	return TestBit(control, 5) && line >= wy
 }
 
 func toScreenColour(color byte) (r, g, b byte) {
