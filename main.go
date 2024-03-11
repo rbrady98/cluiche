@@ -15,7 +15,7 @@ func main() {
 	// log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	// log.SetOutput(logFile)
 
-	game := NewGame(160, 144, "./roms/dr-mario.gb")
+	game := NewGame(160*2, 144*2, "./roms/tetris.gb")
 	ebiten.SetWindowSize(160*3, 144*3)
 	// ebiten.SetWindowTitle(gb.GetRomTitle())
 	if err := ebiten.RunGame(game); err != nil {

@@ -105,6 +105,12 @@ func (m *Memory) Write(addr uint16, val byte) {
 		return
 	}
 
+	// TODO: Implementing memory banking we should turn this off
+	// NOTE: disabling writes to ROM
+	if addr < CartridgeROM {
+		return
+	}
+
 	m.mem[addr] = val
 }
 
