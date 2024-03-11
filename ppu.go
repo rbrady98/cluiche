@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 const (
 	ScreenWidth  = 160
 	ScreenHeight = 144
@@ -80,7 +82,13 @@ func (p *PPU) Update(cycles int) {
 			}
 
 			// draw the scanline as we finish the mode
-			p.RenderBackground(p.mem.Read(LCDC))
+
+			lcdc := p.mem.Read(LCDC)
+
+			p.RenderBackground(lcdc)
+			if TestBit(lcdc, 1) {
+				p.RenderSprites(lcdc)
+			}
 		}
 
 	case Mode0:
@@ -170,7 +178,71 @@ func (p *PPU) RenderBackground(control byte) {
 	}
 }
 
-func (p *PPU) RenderSprites() {}
+func (p *PPU) RenderSprites(control byte) {
+	currentLine := p.getLine()
+	pal1 := p.mem.Read(0xFF48)
+	// pal2 := p.mem.Read(0xFF49)
+
+	size := 8
+	if TestBit(control, 2) {
+		size = 16
+	}
+
+	// loop over all 40 sprites, check which sprites are to be rendered
+	spriteLimit := 0
+	for i := uint16(0); i < 40; i++ {
+		addr := i * 4
+
+		// read the sprite into memory
+		yPos := p.mem.Read(0xFE00+addr) - 16
+		xPos := p.mem.Read(0xFE00+addr+1) - 8
+		tileIdx := p.mem.Read(0xFE00 + addr + 2)
+		flags := p.mem.Read(0xFE00 + addr + 3)
+
+		// check if the sprite should be rendered
+		if currentLine < int(yPos) || currentLine > int(yPos)+size {
+			continue
+		}
+
+		spriteLimit++
+		if spriteLimit > 10 {
+			break
+		}
+		fmt.Printf("Found Sprite, addr: %02X\nX: %d Y: %d\nTile: %02X\n\n", addr, xPos, yPos, tileIdx)
+
+		// xFlip := TestBit(flags, 5)
+		yFlip := TestBit(flags, 6)
+		// priority := TestBit(flags, 7)
+
+		// get the line of the sprite tile that we need to render
+		line := currentLine - int(yPos)
+		if yFlip {
+			line = size - line - 1
+		}
+
+		dataAddr := 0x8000 + (uint16(tileIdx) * 16) + uint16(line*2)
+		d1 := p.mem.Read(dataAddr)
+		d2 := p.mem.Read(dataAddr + 1)
+
+		// draw the tile line
+		for tilePixel := byte(0); tilePixel < 8; tilePixel++ {
+			x := xPos + (7 - tilePixel)
+
+			colourID := ((d2>>x)&1)<<1 | (d1>>x)&1
+
+			// remmeber how this colour checking works
+			// TODO: use correct palette here
+			colour := (pal1 >> (colourID * 2) & 0x3)
+			if colour == 0 {
+				continue
+			}
+
+			r, g, b := toScreenColour(colour)
+
+			p.DrawPixel(int(x), currentLine, r, g, b)
+		}
+	}
+}
 
 func (p *PPU) DrawPixel(x, y int, r, g, b byte) {
 	p.frame[y][x][0] = r

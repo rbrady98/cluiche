@@ -99,6 +99,12 @@ func (m *Memory) Write(addr uint16, val byte) {
 		return
 	}
 
+	// DMA transfer
+	if addr == 0xFF46 {
+		m.doDMATransfer(val)
+		return
+	}
+
 	m.mem[addr] = val
 }
 
@@ -129,4 +135,13 @@ func (m *Memory) GetCartidgeType() {
 	t := m.Read(0x0147)
 
 	fmt.Println(t)
+}
+
+func (m *Memory) doDMATransfer(value byte) {
+	// TODO: how can we get this to take 160 cycles
+	addr := uint16(value) << 8
+
+	for i := uint16(0); i < 0xA0; i++ {
+		m.mem[0xFE00+i] = m.Read(addr + i)
+	}
 }
