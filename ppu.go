@@ -28,12 +28,17 @@ type PPU struct {
 	dots int
 
 	frame [ScreenHeight][ScreenWidth][3]byte
+
+	// bgColourMap caches the background/window pixels on a scanline which use colour id 0
+	// so that sprites can be correctly drawn when they have the priority flag set
+	bgColourMap []bool
 }
 
 func NewPPU(cpu *CPU, mem *Memory) *PPU {
 	return &PPU{
-		mem: mem,
-		cpu: cpu,
+		mem:         mem,
+		cpu:         cpu,
+		bgColourMap: make([]bool, ScreenWidth),
 	}
 }
 
@@ -58,11 +63,7 @@ func (p *PPU) Update(cycles int) {
 
 	switch mode {
 	case Mode2:
-		// OAM Read
 		if p.dots >= 80 {
-			// fmt.Println("Finished OAM READ")
-
-			// move to drawing
 			p.setMode(status, Mode3)
 			p.dots = 0
 		}
@@ -70,8 +71,6 @@ func (p *PPU) Update(cycles int) {
 	case Mode3:
 		// drawing
 		if p.dots >= 172 {
-			// fmt.Println("Mode 3 complete: finished drawing")
-			// move to h blank
 			p.setMode(status, Mode0)
 			p.dots = 0
 
@@ -79,19 +78,18 @@ func (p *PPU) Update(cycles int) {
 				p.cpu.requestInterrupt(1)
 			}
 
-			// draw the scanline as we finish the mode
-
 			lcdc := p.mem.Read(LCDC)
 
 			p.RenderBackground(lcdc)
 			if TestBit(lcdc, 1) {
 				p.RenderSprites(lcdc)
 			}
+
+			clear(p.bgColourMap)
 		}
 
 	case Mode0:
 		if p.dots >= 204 {
-			// fmt.Println("Mode 0 complete")
 			p.dots = 0
 			p.setLine(line + 1)
 			p.setMode(status, Mode2)
@@ -158,8 +156,6 @@ func (p *PPU) RenderBackground(control byte) {
 			tileAddr = tileDataAddr + (uint16(tileNum) * 16)
 		}
 
-		// fmt.Printf("lcd control: %02X tilenum: %02X tilenumaddr: %02X tiledataaddr: %02X\n", control, tileNum, tileNum, tileAddr)
-
 		// read correct two bytes based on current line
 		yOffset := (yPos % 8) * 2
 		xOffset := 7 - (xPos % 8)
@@ -167,12 +163,11 @@ func (p *PPU) RenderBackground(control byte) {
 		d1 := p.mem.Read(tileAddr + uint16(yOffset))
 		d2 := p.mem.Read(tileAddr + uint16(yOffset) + 1)
 
-		colourID := ((d2>>xOffset)&1)<<1 | (d1>>xOffset)&1
+		colourID := toColourID(d1, d2, byte(xOffset))
 
-		colour := (palette >> (colourID * 2) & 0x3)
-		r, g, b := toScreenColour(colour)
+		p.RenderPixel(colourID, palette, int(pixel), currentLine)
 
-		p.DrawPixel(int(pixel), currentLine, r, g, b)
+		p.bgColourMap[pixel] = colourID == 0
 	}
 }
 
@@ -185,6 +180,8 @@ func (p *PPU) RenderSprites(control byte) {
 	if TestBit(control, 2) {
 		size = 16
 	}
+
+	var spriteXPositions [ScreenWidth]int
 
 	// loop over all 40 sprites, check which sprites are to be rendered
 	spriteLimit := 0
@@ -207,9 +204,9 @@ func (p *PPU) RenderSprites(control byte) {
 			break
 		}
 
-		// xFlip := TestBit(flags, 5)
+		xFlip := TestBit(flags, 5)
 		yFlip := TestBit(flags, 6)
-		// priority := TestBit(flags, 7)
+		priority := TestBit(flags, 7)
 
 		// get the line of the sprite tile that we need to render
 		line := currentLine - int(yPos)
@@ -224,29 +221,48 @@ func (p *PPU) RenderSprites(control byte) {
 		// draw the tile line
 		for tilePixel := byte(0); tilePixel < 8; tilePixel++ {
 			x := xPos + (7 - tilePixel)
+			if xFlip {
+				x = xPos + tilePixel
+			}
+
 			if x > ScreenWidth {
 				continue
 			}
 
-			colourID := ((d2>>tilePixel)&1)<<1 | (d1>>tilePixel)&1
+			// check the sprite priority of the current pixel
+			if spriteXPositions[x] != 0 && spriteXPositions[x] <= int(xPos)+1 {
+				continue
+			}
+
+			// if we have bg priority flag set and the colour id of current pixel in the background
+			// is not colour id 0 then we skip this as we are drawing sprites below the bg
+			if priority && !p.bgColourMap[x] {
+				continue
+			}
+
+			colourID := toColourID(d1, d2, tilePixel)
 			if colourID == 0 {
 				continue
 			}
 
-			// remmeber how this colour checking works
-			// TODO: use correct palette here
 			pal := pal1
 			if TestBit(flags, 4) {
 				pal = pal2
 			}
 
-			colour := (pal >> (colourID * 2) & 0x3)
+			p.RenderPixel(colourID, pal, int(x), currentLine)
 
-			r, g, b := toScreenColour(colour)
-
-			p.DrawPixel(int(x), currentLine, r, g, b)
+			spriteXPositions[x] = int(xPos + 1) // add one here to use 0 as empty value
 		}
 	}
+}
+
+func (p *PPU) RenderPixel(colourID byte, palette byte, x int, y int) {
+	colour := (palette >> (colourID * 2) & 0x3)
+
+	r, g, b := toScreenColour(colour)
+
+	p.DrawPixel(x, y, r, g, b)
 }
 
 func (p *PPU) DrawPixel(x, y int, r, g, b byte) {
@@ -282,6 +298,10 @@ func (p *PPU) getTileDataAddress(control byte) uint16 {
 
 func (p *PPU) inWindow(control byte, wy int, line int) bool {
 	return TestBit(control, 5) && line >= wy
+}
+
+func toColourID(d1, d2, pixel byte) byte {
+	return ((d2>>pixel)&1)<<1 | (d1>>pixel)&1
 }
 
 func toScreenColour(color byte) (r, g, b byte) {
