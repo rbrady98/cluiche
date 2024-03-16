@@ -34,7 +34,7 @@ func NewGameboy(romPath string) (*Gameboy, error) {
 		return nil, err
 	}
 
-	gb.GetCartType()
+	// gb.GetCartType()
 
 	return gb, nil
 }
@@ -43,9 +43,9 @@ func (g *Gameboy) GetRomTitle() string {
 	return g.memory.GetCartTitle()
 }
 
-func (g *Gameboy) GetCartType() {
-	g.memory.GetCartidgeType()
-}
+// func (g *Gameboy) GetCartType() {
+// 	g.memory.GetCartidgeType()
+// }
 
 // Update updates the state for a single frame
 func (g *Gameboy) Update() {

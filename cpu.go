@@ -1259,7 +1259,8 @@ func (c *CPU) handleInterrupt() int {
 func (c *CPU) updateTimers(cycles int) {
 	c.dividerCounter += cycles
 	if c.dividerCounter >= 256 {
-		c.memory.mem[DIV]++
+		// TODO: can this go straight to mem.write
+		c.memory.io[DIV-0xFF00]++
 		c.dividerCounter -= 256
 	}
 

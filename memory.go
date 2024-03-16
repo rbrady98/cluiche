@@ -1,16 +1,41 @@
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"github.com/rbrady98/cluiche/cartridge"
 )
 
 const (
-	CartridgeROM = 0x8000
+	//
+	CartridgeROM            = 0x8000
+	VRAM                    = 0xA000
+	ExternalRAM             = 0xC000
+	WRAM                    = 0xE000
+	EchoRAM                 = 0xFE00
+	OAM                     = 0xFEA0
+	NotUsable               = 0xFF00
+	IO                      = 0xFF80
+	HRAM                    = 0xFFFF
+	InterruptEnableRegister = 0xFFFF
 )
 
 type Memory struct {
-	mem [0xFFFF + 1]byte
+	// cart memory
+	cart *cartridge.Cart
+	// VRAM
+	vram [0x2000]byte
+	// WRAM
+	wram [0x2000]byte
+	// OAM
+	oam [0x100]byte
+	// IO
+	io [0x80]byte
+	// HRAM
+	hram [0x7F]byte
+
+	interruptEnable byte
+	// mem  [0xFFFF + 1]byte
 
 	cpu   *CPU
 	input *Input
@@ -19,99 +44,148 @@ type Memory struct {
 func NewMemory() *Memory {
 	m := &Memory{}
 
-	m.mem[0xFF00] = 0xCF
-	m.mem[0xFF05] = 0x00
-	m.mem[0xFF06] = 0x00
-	m.mem[0xFF07] = 0xF8
-	m.mem[0xFF0F] = 0xE1
-	m.mem[0xFF10] = 0x80
-	m.mem[0xFF11] = 0xBF
-	m.mem[0xFF12] = 0xF3
-	m.mem[0xFF14] = 0xBF
-	m.mem[0xFF16] = 0x3F
-	m.mem[0xFF17] = 0x00
-	m.mem[0xFF19] = 0xBF
-	m.mem[0xFF1A] = 0x7F
-	m.mem[0xFF1B] = 0xFF
-	m.mem[0xFF1C] = 0x9F
-	m.mem[0xFF1E] = 0xBF
-	m.mem[0xFF20] = 0xFF
-	m.mem[0xFF21] = 0x00
-	m.mem[0xFF22] = 0x00
-	m.mem[0xFF23] = 0xBF
-	m.mem[0xFF24] = 0x77
-	m.mem[0xFF25] = 0xF3
-	m.mem[0xFF26] = 0xF1
-	m.mem[0xFF40] = 0x91
-	m.mem[0xFF42] = 0x00
-	m.mem[0xFF43] = 0x00
-	m.mem[0xFF45] = 0x00
-	m.mem[0xFF47] = 0xFC
-	m.mem[0xFF48] = 0xFF
-	m.mem[0xFF49] = 0xFF
-	m.mem[0xFF4A] = 0x00
-	m.mem[0xFF4B] = 0x00
-	m.mem[0xFFFF] = 0x00
+	m.io[0x00] = 0xCF
+	m.io[0x05] = 0x00
+	m.io[0x06] = 0x00
+	m.io[0x07] = 0xF8
+	m.io[0x0F] = 0xE1
+	m.io[0x10] = 0x80
+	m.io[0x11] = 0xBF
+	m.io[0x12] = 0xF3
+	m.io[0x14] = 0xBF
+	m.io[0x16] = 0x3F
+	m.io[0x17] = 0x00
+	m.io[0x19] = 0xBF
+	m.io[0x1A] = 0x7F
+	m.io[0x1B] = 0xFF
+	m.io[0x1C] = 0x9F
+	m.io[0x1E] = 0xBF
+	m.io[0x20] = 0xFF
+	m.io[0x21] = 0x00
+	m.io[0x22] = 0x00
+	m.io[0x23] = 0xBF
+	m.io[0x24] = 0x77
+	m.io[0x25] = 0xF3
+	m.io[0x26] = 0xF1
+	m.io[0x40] = 0x91
+	m.io[0x42] = 0x00
+	m.io[0x43] = 0x00
+	m.io[0x45] = 0x00
+	m.io[0x47] = 0xFC
+	m.io[0x48] = 0xFF
+	m.io[0x49] = 0xFF
+	m.io[0x4A] = 0x00
+	m.io[0x4B] = 0x00
+	m.interruptEnable = 0x00
 
 	return m
 }
 
 func (m *Memory) Read(addr uint16) byte {
-	// just for debugging
-	// if addr == 0xFF44 || addr == 0xff02 {
-	// 	return 0x90
-	// }
+	switch {
+	case addr < CartridgeROM:
+		return m.cart.Read(addr)
 
-	if addr == JOYP {
-		return m.input.GetInput(m.mem[JOYP])
+	case addr < VRAM:
+		return m.vram[addr-CartridgeROM]
+
+	case addr < ExternalRAM:
+		return m.cart.Read(addr)
+
+	case addr < WRAM:
+		return m.wram[addr-ExternalRAM]
+
+	case addr < EchoRAM:
+		// noop not implementing echo ram
+		return 0xFF
+
+	case addr < OAM:
+		return m.oam[addr-EchoRAM]
+
+	case addr < NotUsable:
+		// noop gameboy is not allowed to read from this addr
+		return 0xFF
+
+	case addr < IO:
+		if addr == JOYP {
+			return m.input.GetInput(m.io[JOYP-0xFF00])
+		}
+
+		return m.io[addr-NotUsable]
+
+	case addr < HRAM:
+		return m.hram[addr-IO]
+
+	default:
+		return m.interruptEnable
 	}
-
-	return m.mem[addr]
 }
 
 func (m *Memory) Write(addr uint16, val byte) {
-	// if addr == 0xFF01 {
-	// 	fmt.Print(string(m.mem[0xFF01]))
-	// }
-	if addr == JOYP {
-		m.mem[addr] = val & 0x30
-		return
-	}
+	switch {
+	case addr < CartridgeROM:
+		m.cart.WriteROM(addr, val)
 
-	// reset the divider register when written to
-	if addr == DIV {
-		m.mem[addr] = 0
-		m.cpu.dividerCounter = 0
-		m.cpu.SetClockFreq()
-		return
-	}
+	case addr < VRAM:
+		m.vram[addr-CartridgeROM] = val
 
-	// reset if tac is written to
-	if addr == TAC {
-		curFreq := m.cpu.GetClockFreq()
-		m.mem[addr] = val
-		newFreq := m.cpu.GetClockFreq()
+	case addr < ExternalRAM:
+		m.cart.WriteRAM(addr, val)
 
-		if newFreq != curFreq {
-			m.cpu.SetClockFreq()
+	case addr < WRAM:
+		m.wram[addr-ExternalRAM] = val
+
+	case addr < EchoRAM:
+		// noop not implementing echo ram
+
+	case addr < OAM:
+		m.oam[addr-EchoRAM] = val
+
+	case addr < NotUsable:
+		// noop gameboy is not allowed to read from this addr
+
+	case addr < IO:
+		// TODO: if this gets longer write a WriteIO method
+		if addr == JOYP {
+			m.io[addr-NotUsable] = val & 0x30
+			return
 		}
 
-		return
-	}
+		// reset the divider register when written to
+		if addr == DIV {
+			m.io[addr-NotUsable] = 0
+			m.cpu.dividerCounter = 0
+			m.cpu.SetClockFreq()
+			return
+		}
 
-	// DMA transfer
-	if addr == 0xFF46 {
-		m.doDMATransfer(val)
-		return
-	}
+		// reset if tac is written to
+		if addr == TAC {
+			curFreq := m.cpu.GetClockFreq()
+			m.io[addr-NotUsable] = val
+			newFreq := m.cpu.GetClockFreq()
 
-	// TODO: Implementing memory banking we should turn this off
-	// NOTE: disabling writes to ROM
-	if addr < CartridgeROM {
-		return
-	}
+			if newFreq != curFreq {
+				m.cpu.SetClockFreq()
+			}
 
-	m.mem[addr] = val
+			return
+		}
+
+		// DMA transfer
+		if addr == 0xFF46 {
+			m.doDMATransfer(val)
+			return
+		}
+
+		m.io[addr-NotUsable] = val
+
+	case addr < HRAM:
+		m.hram[addr-IO] = val
+
+	default:
+		m.interruptEnable = val
+	}
 }
 
 func (m *Memory) LoadROM(path string) error {
@@ -120,27 +194,18 @@ func (m *Memory) LoadROM(path string) error {
 		return err
 	}
 
-	copy(m.mem[:CartridgeROM], data)
+	c, err := cartridge.NewCart(data)
+	if err != nil {
+		return err
+	}
+
+	m.cart = c
 
 	return nil
 }
 
 func (m *Memory) GetCartTitle() string {
-	title := m.mem[0x0134:0x0143]
-
-	return string(title)
-}
-
-func (m *Memory) GetLicenseeCode() {
-	code := m.mem[0x0144:0x0145]
-
-	fmt.Println(string(code))
-}
-
-func (m *Memory) GetCartidgeType() {
-	t := m.Read(0x0147)
-
-	fmt.Println(t)
+	return m.cart.Title()
 }
 
 func (m *Memory) doDMATransfer(value byte) {
@@ -148,6 +213,6 @@ func (m *Memory) doDMATransfer(value byte) {
 	addr := uint16(value) << 8
 
 	for i := uint16(0); i < 0xA0; i++ {
-		m.mem[0xFE00+i] = m.Read(addr + i)
+		m.oam[i] = m.Read(addr + i)
 	}
 }

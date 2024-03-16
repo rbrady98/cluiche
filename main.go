@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	game := NewGame(160*2, 144*2, "./roms/dr-mario.gb")
+	game := NewGame(160*2, 144*2, "./roms/tetris.gb")
 	ebiten.SetWindowSize(160*4, 144*4)
 	ebiten.SetWindowTitle(game.gb.GetRomTitle())
 	if err := ebiten.RunGame(game); err != nil {
