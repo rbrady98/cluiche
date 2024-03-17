@@ -189,7 +189,7 @@ func (p *PPU) RenderSprites(control byte) {
 		addr := i * 4
 
 		// read the sprite into memory
-		yPos := p.mem.Read(0xFE00+addr) - 16
+		yPos := int16(p.mem.Read(0xFE00+addr)) - 16
 		xPos := p.mem.Read(0xFE00+addr+1) - 8
 		tileIdx := p.mem.Read(0xFE00 + addr + 2)
 		flags := p.mem.Read(0xFE00 + addr + 3)
