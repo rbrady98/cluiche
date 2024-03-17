@@ -225,7 +225,7 @@ func (p *PPU) RenderSprites(control byte) {
 				x = xPos + tilePixel
 			}
 
-			if x > ScreenWidth {
+			if x >= ScreenWidth {
 				continue
 			}
 

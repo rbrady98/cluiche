@@ -34,19 +34,19 @@ func (m *MBC1) Read(addr uint16) byte {
 	case addr < 0x4000: // fixed bank 0
 		return m.rom[addr]
 	case addr < 0x8000: // variable rom bank
-		offset := uint16(m.romBank*romBankSize) - romOffset
-		return m.rom[addr+offset]
+		offset := uint32(m.romBank*romBankSize) - romOffset
+		return m.rom[uint32(addr)+offset]
 	default: // reading from the ram bank
-		offset := uint16(m.ramBank*ramBankSize) - ramOffset
-		return m.ram[addr+offset]
+		offset := uint32(m.ramBank*ramBankSize) - ramOffset
+		return m.ram[uint32(addr)+offset]
 	}
 }
 
 // WriteRAM implements BankController.
 func (m *MBC1) WriteRAM(addr uint16, value byte) {
 	if m.ramEnabled {
-		offset := uint16(m.ramBank*ramBankSize) - ramOffset
-		m.ram[addr+offset] = value
+		offset := uint32(m.ramBank*ramBankSize) - ramOffset
+		m.ram[uint32(addr)+offset] = value
 	}
 }
 
@@ -58,7 +58,7 @@ func (m *MBC1) WriteROM(addr uint16, value byte) {
 
 	case addr < mbc1ROMBankRegister:
 		// TODO: handle large roms with added banking
-		b := 0xE0 | (value & 0x1F)
+		b := value & 0x1F
 		m.romBank = translateBank(b)
 
 	case addr < mbc1RAMBankRegister:

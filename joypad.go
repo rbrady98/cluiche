@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 const JOYP uint16 = 0xFF00
 
 type Button byte

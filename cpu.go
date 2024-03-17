@@ -664,7 +664,7 @@ func (c *CPU) execute(op byte, prefixed bool) uint16 {
 		case 0x76:
 			c.halt()
 		default:
-			panic(fmt.Sprintf("unimplemented opcode: %#2x\n", op))
+			panic(fmt.Sprintf("unimplemented opcode: %02x at PC: %02X\n", op, c.pc))
 		}
 	} else {
 		switch op {

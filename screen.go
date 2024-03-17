@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -21,6 +24,7 @@ func NewGame(w, h int, romPath string) *Game {
 	}
 
 	ebiten.SetTPS(60)
+	ebiten.SetVsyncEnabled(false)
 
 	return &Game{
 		width:  w,
@@ -40,6 +44,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.WritePixels(g.gb.GetRenderedFrame())
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("fps: %.2f\ntps: %.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (width, height int) {
