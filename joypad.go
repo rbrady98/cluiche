@@ -53,12 +53,10 @@ func NewInput() *Input {
 func (i *Input) PressButton(cpu *CPU, button Button) {
 	*i = Input(ResetBit(byte(*i), byte(button)))
 	cpu.requestInterrupt(4)
-	fmt.Println("Button Pressed:", button)
 }
 
 func (i *Input) ReleaseButton(button Button) {
 	*i = Input(SetBit(byte(*i), byte(button)))
-	fmt.Println("Button Released:", button)
 }
 
 func (i *Input) GetInput(enabled byte) byte {

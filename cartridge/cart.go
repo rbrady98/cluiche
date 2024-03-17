@@ -24,6 +24,9 @@ func NewCart(rom []byte) (*Cart, error) {
 	case 0x00:
 		// create a rom only bank controller
 		cart.BankController = NewROM(rom)
+	case 0x01:
+		// create a rom only bank controller
+		cart.BankController = NewMBC1(rom)
 	default:
 		return nil, fmt.Errorf("unsupported rom type: %02X", cartType)
 	}
